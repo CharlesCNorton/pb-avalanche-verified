@@ -13,6 +13,14 @@ theories/pb_avalanche_spitzer_constants.v
 theories/pb_avalanche_gamow.v
 theories/pb_avalanche_fokker_planck.v
 theories/pb_avalanche_sw_kinetic.v
+theories/pb_avalanche_ash.v
+theories/pb_avalanche_chain.v
+theories/pb_avalanche_spatial.v
+theories/pb_avalanche_energy_balance.v
+theories/pb_avalanche_laser.v
+theories/pb_avalanche_nuclear.v
+theories/pb_avalanche_eddington.v
+theories/pb_avalanche_constructive.v
 theories/pb_avalanche_final.v
 theories/pb_avalanche_romberg.v
 theories/pb_avalanche_audit.v

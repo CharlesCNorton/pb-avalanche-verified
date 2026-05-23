@@ -39,6 +39,14 @@ From PBAvalanche Require Import
   pb_avalanche_gamow
   pb_avalanche_fokker_planck
   pb_avalanche_sw_kinetic
+  pb_avalanche_ash
+  pb_avalanche_chain
+  pb_avalanche_spatial
+  pb_avalanche_energy_balance
+  pb_avalanche_laser
+  pb_avalanche_nuclear
+  pb_avalanche_eddington
+  pb_avalanche_constructive
   pb_avalanche_romberg
   pb_avalanche_final.
 
@@ -348,6 +356,85 @@ Print Assumptions FP_op_slowing_no_diffusion.
 
 Print Assumptions SW_K_sigma_v_product.
 Print Assumptions SW_K_FoM_upper_bound.
+
+(* ================================================================== *)
+(* === pb_avalanche_ash.v — helium-ash self-quenching === *)
+(* ================================================================== *)
+
+Print Assumptions n_eff_with_ash_pos.
+Print Assumptions tau_slow_alpha_ash_pos.
+Print Assumptions tau_slow_alpha_ash_decreasing.
+Print Assumptions M_ash_decreasing.
+
+(* ================================================================== *)
+(* === pb_avalanche_chain.v — geometric chain sum === *)
+(* ================================================================== *)
+
+Print Assumptions M_chain_total.
+Print Assumptions chain_convergence.
+Print Assumptions chain_sum_nonneg.
+Print Assumptions chain_total_pos.
+Print Assumptions chain_total_monotone.
+Print Assumptions chain_total_at_concrete.
+Print Assumptions chain_total_concrete_bound.
+Print Assumptions chain_total_at_physical.
+Print Assumptions chain_diverges_at_one.
+
+(* ================================================================== *)
+(* === pb_avalanche_spatial.v — radial volumetric profile === *)
+(* ================================================================== *)
+
+Print Assumptions RInt_r_squared.
+Print Assumptions RInt_r_squared_pos.
+Print Assumptions M_volumetric_pointwise_bound.
+Print Assumptions M_volumetric_uniform.
+
+(* ================================================================== *)
+(* === pb_avalanche_energy_balance.v — radiation losses === *)
+(* ================================================================== *)
+
+Print Assumptions C_brems_pos.
+Print Assumptions C_sync_pos.
+Print Assumptions bremsstrahlung_pos.
+Print Assumptions synchrotron_pos.
+Print Assumptions energy_balance_bremsstrahlung_bound.
+Print Assumptions energy_balance_density_constraint.
+
+(* ================================================================== *)
+(* === pb_avalanche_laser.v — laser-driven out-of-scope === *)
+(* ================================================================== *)
+
+Print Assumptions laser_witness_product.
+Print Assumptions ln2_gt_one_third.
+Print Assumptions laser_witness_above_unity.
+Print Assumptions laser_witness_outside_magnetic_envelope.
+
+(* ================================================================== *)
+(* === pb_avalanche_nuclear.v — generalized reactant pairs === *)
+(* ================================================================== *)
+
+Print Assumptions pB_coulomb_strength.
+Print Assumptions pB_reduced_mass.
+Print Assumptions DHe3_coulomb_strength.
+Print Assumptions DHe3_reduced_mass.
+Print Assumptions DD_coulomb_strength.
+Print Assumptions DD_reduced_mass.
+Print Assumptions coulomb_barrier_ordering.
+Print Assumptions Q_value_ordering.
+
+(* ================================================================== *)
+(* === pb_avalanche_eddington.v — solar instantiation === *)
+(* ================================================================== *)
+
+Print Assumptions solar_no_avalanche.
+Print Assumptions solar_safety_margin.
+Print Assumptions SolarSettlement.hora_putvinski_settlement.
+
+(* ================================================================== *)
+(* === pb_avalanche_constructive.v — classical-free subset === *)
+(* ================================================================== *)
+
+Print Assumptions hora_putvinski_constructive.
 
 (* ================================================================== *)
 (* === pb_avalanche_romberg.v — Richardson extrapolation === *)

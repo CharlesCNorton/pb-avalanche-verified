@@ -314,6 +314,64 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Maxwellian-thermal connection (item 22) === *)
+(* ================================================================== *)
+
+(* Thermal primary rate: R_primary = n_p * n_B * <sigma v>_T. This
+   replaces the abstract R_prim of PK.kinetic_no_avalanche with a
+   product driven by the Maxwellian reactivity. Under the same
+   composite-product subcriticality condition, the multiplication
+   factor stays below unity. The thermal-averaged sigma*v can be
+   estimated by reactivity_bound (in pb_avalanche_thermal.v) using
+   sv_max := sigma_E_max * v_E_max. *)
+
+Definition thermal_R_prim (n_p n_B sv_avg : R) : R :=
+  n_p * n_B * sv_avg.
+
+Lemma thermal_R_prim_pos :
+  forall n_p n_B sv_avg, 0 < n_p -> 0 < n_B -> 0 < sv_avg ->
+    0 < thermal_R_prim n_p n_B sv_avg.
+Proof.
+  intros. unfold thermal_R_prim.
+  apply Rmult_lt_0_compat; [apply Rmult_lt_0_compat |]; assumption.
+Qed.
+
+Theorem thermal_kinetic_no_avalanche :
+  forall n_p n_B sv_avg tau,
+    0 < n_p -> 0 < n_B -> 0 < sv_avg -> 0 < tau ->
+    3 * tau * n_B * PK.L_kin *
+      (PhysicalKineticParams.sigma_E_max *
+       PhysicalKineticParams.v_E_max) < 1 ->
+    PK.R_secondary_kinetic n_B (3 * thermal_R_prim n_p n_B sv_avg) tau
+      / thermal_R_prim n_p n_B sv_avg < 1.
+Proof.
+  intros n_p n_B sv_avg tau Hnp HnB Hsv Htau Hsub.
+  apply PK.kinetic_no_avalanche.
+  - apply thermal_R_prim_pos; assumption.
+  - exact HnB.
+  - exact Htau.
+  - exact Hsub.
+Qed.
+
+(* Specializing to the ITER-class envelope: at the explicit numerical
+   bounds, the thermal-kinetic conclusion fires. *)
+Theorem thermal_kinetic_iter_no_avalanche :
+  forall n_p sv_avg,
+    0 < n_p -> 0 < sv_avg ->
+    PK.R_secondary_kinetic iter_n_B
+      (3 * thermal_R_prim n_p iter_n_B sv_avg) iter_tau_slow
+      / thermal_R_prim n_p iter_n_B sv_avg < 1.
+Proof.
+  intros n_p sv_avg Hnp Hsv.
+  apply thermal_kinetic_no_avalanche.
+  - exact Hnp.
+  - exact iter_n_B_pos.
+  - exact Hsv.
+  - exact iter_tau_slow_pos.
+  - exact iter_product_subcritical.
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
@@ -323,3 +381,6 @@ Print Assumptions admissible_product_subcritical.
 Print Assumptions PK_L_lt_1.
 Print Assumptions iter_witness_no_avalanche.
 Print Assumptions iter_witness_monotone_in_B.
+Print Assumptions thermal_R_prim_pos.
+Print Assumptions thermal_kinetic_no_avalanche.
+Print Assumptions thermal_kinetic_iter_no_avalanche.
