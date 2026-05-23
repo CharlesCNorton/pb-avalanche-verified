@@ -505,6 +505,58 @@ Module PBAvalancheFramework (P : PB_AVALANCHE_PARAMS).
     exact (reactor_FoM_upper_bound s Hr).
   Qed.
 
+  (* === Pointwise bound at state-specific parameters ===
+
+     A sharper bound on the multiplication factor evaluated at the
+     plasma state's own kinetic parameters, rather than at the regime
+     envelope. This holds for every plasma state (not just reactor-
+     regime ones) and exposes how the bound varies pointwise. *)
+
+  Theorem multiplication_factor_pointwise_bound :
+    forall (s : PlasmaState),
+      multiplication_factor s <=
+        3 * n_B s * tau_slow_alpha s * (sigma_knockon_max * v_alpha_max).
+  Proof.
+    intros s.
+    rewrite multiplication_factor_equals_figure_of_merit.
+    unfold avalanche_figure_of_merit.
+    apply Rmult_le_compat_l.
+    - apply Rmult_le_pos.
+      + apply Rmult_le_pos.
+        * apply Rlt_le. lra.
+        * apply Rlt_le. exact (pos_n_B s).
+      + apply Rlt_le. exact (tau_slow_alpha_positive s).
+    - exact (alpha_weighted_integral_uniform_bound s).
+  Qed.
+
+  (* === Strict positivity of the safety margin ===
+     Within the reactor regime, the gap 1 - M(s) is strictly positive. *)
+
+  Theorem reactor_safety_margin_positive :
+    forall (s : PlasmaState),
+      reactor_regime s ->
+      0 < 1 - multiplication_factor s.
+  Proof.
+    intros s Hr.
+    pose proof (reactor_no_multiplication s Hr) as HM.
+    lra.
+  Qed.
+
+  (* === Quantitative safety margin ===
+     The safety margin is bounded below by 1 - FoM_max_reactor. *)
+
+  Theorem reactor_safety_margin_bound :
+    forall (s : PlasmaState),
+      reactor_regime s ->
+      1 - FoM_max_reactor <= 1 - multiplication_factor s.
+  Proof.
+    intros s Hr.
+    rewrite multiplication_factor_equals_figure_of_merit.
+    apply Rplus_le_compat_l.
+    apply Ropp_le_contravar.
+    exact (reactor_FoM_upper_bound s Hr).
+  Qed.
+
 End PBAvalancheFramework.
 
 (* ================================================================== *)
@@ -757,6 +809,19 @@ Proof.
   - rewrite concrete_FoM_max_reactor_value. apply Rle_refl.
 Qed.
 
+(* Quantitative safety margin in the concrete settlement: M(s) <= 3/100
+   gives a safety margin of at least 97/100 below the avalanche
+   threshold throughout the reactor regime. *)
+Theorem concrete_safety_margin :
+  forall (s : PlasmaState),
+    ConcreteSettlement.reactor_regime s ->
+    97 / 100 <= 1 - ConcreteSettlement.multiplication_factor s.
+Proof.
+  intros s Hr.
+  pose proof (concrete_multiplication_factor_bound s Hr) as Hbd.
+  lra.
+Qed.
+
 (* ================================================================== *)
 (* === Concrete reactor-regime plasma witness === *)
 (* ================================================================== *)
@@ -859,6 +924,7 @@ Print Assumptions ConcreteSettlement.reactor_no_multiplication.
 Print Assumptions ConcreteSettlement.hora_putvinski_settlement.
 Print Assumptions concrete_FoM_max_reactor_value.
 Print Assumptions concrete_multiplication_factor_bound.
+Print Assumptions concrete_safety_margin.
 Print Assumptions witness_no_avalanche.
 Print Assumptions witness_multiplication_factor_bound.
 
