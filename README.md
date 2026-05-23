@@ -10,7 +10,25 @@ strictly below unity throughout the reactor regime.
 
 ## Structure
 
-The development has four layers, all in `theories/pb_avalanche.v`.
+The development is split across nine files under `theories/`.
+The core abstract framework, four classical instantiations, and
+the rescaled witness sit in `pb_avalanche.v`. The remaining files
+add the integral-derived alpha-velocity bound
+(`pb_avalanche_integral.v`), the energy-resolved kinetic
+framework with slowing-down spectrum and Fokker-Planck steady
+state (`pb_avalanche_kinetic.v`), the admissible-envelope and
+Hora-regime no-avalanche statements
+(`pb_avalanche_envelope.v`), the Maxwellian-averaged reactivity
+and primary-rate temperature dependence
+(`pb_avalanche_thermal.v`), the Spitzer-Trubnikov slowing-down
+time with Coulomb-logarithm bounds
+(`pb_avalanche_spitzer.v`), the IAEA-evaluated cross-section
+table with piecewise-linear interpolation and bounded
+trapezoidal integration error
+(`pb_avalanche_iaea.v`), the unit-indexed real type that
+enforces dimensional homogeneity (`pb_avalanche_units.v`), and
+the final aggregate theorem `pb_avalanche_settlement` composing
+all of the above (`pb_avalanche_final.v`).
 
 **Abstract framework (Module Type `PB_AVALANCHE_PARAMS`).**
 Encapsulates the kinetic input as named parameters: the primary and
@@ -231,13 +249,43 @@ both documented in the module signature.
 make
 ```
 
-Generates `Makefile.coq` via `rocq makefile` and compiles
-`theories/pb_avalanche.v`.
+Generates `Makefile.coq` via `rocq makefile` and compiles all nine
+files in `theories/`.
 
 ## Dependencies
 
-- Rocq 9.0 with Stdlib `Reals` and `Lra` (main file).
-- Coquelicot 3.4 (integral derivation file).
+- Rocq 9.0 with Stdlib `Reals`, `Lra`, `ZArith`, `Lia`, and `List`.
+- Coquelicot 3.4 for the integrals, derivative chains, and
+  fundamental theorem of calculus.
+
+## Axiom footprint
+
+Every theorem in the development closes by `Qed`. The combined
+axiom footprint over all nine files is exactly the three Stdlib
+Dedekind-real axioms
+
+    ClassicalDedekindReals.sig_forall_dec
+    ClassicalDedekindReals.sig_not_dec
+    FunctionalExtensionality.functional_extensionality_dep
+
+plus `Classical_Prop.classic` (excluded middle) pulled in by
+Coquelicot's fundamental-theorem-of-calculus machinery. No
+`Admitted`, no `admit`, and no project-local axioms.
+
+The aggregate closing theorem `pb_avalanche_settlement` in
+`theories/pb_avalanche_final.v` bundles:
+
+1. the bilinear kinetic factorization of the secondary rate;
+2. the sufficient subcriticality condition `M < 1`;
+3. the two-sided sandwich on the figure of merit;
+4. the universal admissible-envelope statement;
+5. the Hora-regime rebuttal;
+6. the steady-state slowing-down flux identity;
+7. the Spitzer-Trubnikov `tau ~ T^(3/2)` scaling law;
+8. the IAEA-evaluated piecewise-linear interpolation error bound;
+9. the dimensional balance of the multiplication factor;
+10. across-the-board subcriticality of all six instances of
+    `PB_AVALANCHE_PARAMS`.
 
 ## References
 

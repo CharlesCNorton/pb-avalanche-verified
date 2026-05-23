@@ -1,12 +1,5 @@
 (******************************************************************************)
 (*                                                                            *)
-(*     WORK IN PROGRESS -- not yet in the build (_CoqProject).                *)
-(*     The thermal exp-integral RInt_exp_thermal and the field-equation       *)
-(*     derivative is_derive_neg_T_exp compile; continuous_exp_thermal and     *)
-(*     the downstream reactivity bounds still have open obligations around     *)
-(*     the Coquelicot continuity combinators (continuous_opp / continuous_id  *)
-(*     instance resolution). Re-add to _CoqProject once green.                *)
-(*                                                                            *)
 (*     Maxwellian-averaged reactivity and the temperature dependence          *)
 (*     of the primary rate (item 4)                                           *)
 (*                                                                            *)
@@ -53,15 +46,21 @@ Proof.
     field. exact HT.
 Qed.
 
+Lemma exp_thermal_rewrite :
+  forall T x, T <> 0 -> exp (- x / T) = exp (x * (- / T)).
+Proof. intros T x HT. f_equal. field. exact HT. Qed.
+
 Lemma continuous_exp_thermal :
   forall T E, T <> 0 -> continuous (fun x : R => exp (- x / T)) E.
 Proof.
   intros T E HT.
-  apply (continuous_comp (fun x : R => - x / T) exp).
-  - apply (continuous_mult (fun x : R => - x) (fun _ => / T)).
-    + apply continuous_opp. apply continuous_id.
+  apply continuous_ext with (f := fun x : R => exp (x * (- / T))).
+  - intro x. symmetry. apply exp_thermal_rewrite. exact HT.
+  - apply (continuous_comp (fun x : R => x * (- / T)) exp);
+      [| apply continuous_exp].
+    apply (continuous_mult (fun x : R => x) (fun _ : R => - / T)).
+    + apply continuous_id.
     + apply continuous_const.
-  - apply continuous_exp.
 Qed.
 
 (* The thermal normalization integral over [0, b]. *)
@@ -76,7 +75,10 @@ Proof.
   { replace (T * (1 - exp (- b / T))) with
       (minus ((fun x : R => - T * exp (- x / T)) b)
              ((fun x : R => - T * exp (- x / T)) 0)).
-    - apply (@is_RInt_derive R_CompleteNormedModule).
+    - apply (@is_RInt_derive R_CompleteNormedModule
+               (fun x : R => - T * exp (- x / T))
+               (fun E : R => exp (- E / T))
+               0 b).
       + intros x _. apply is_derive_neg_T_exp. exact HTne.
       + intros x _. apply continuous_exp_thermal. exact HTne.
     - simpl. unfold minus, plus, opp; simpl.
