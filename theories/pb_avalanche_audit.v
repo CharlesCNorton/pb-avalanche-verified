@@ -49,6 +49,13 @@ From PBAvalanche Require Import
   pb_avalanche_constructive
   pb_avalanche_romberg
   pb_avalanche_spline
+  pb_avalanche_corner
+  pb_avalanche_energy_resolved
+  pb_avalanche_spitzer_numerical
+  pb_avalanche_coulomb_log
+  pb_avalanche_maxwellian_sw
+  pb_avalanche_synchrotron
+  pb_avalanche_hora_rebuttal
   pb_avalanche_final.
 
 (* ================================================================== *)
@@ -491,3 +498,11 @@ Print Assumptions pb_avalanche_settlement.
 Print Assumptions hermite_cubic_at_left.
 Print Assumptions hermite_cubic_at_right.
 Print Assumptions hermite_cubic_linear_case.
+Print Assumptions energy_resolved_kinetic_FoM_numerical.
+Print Assumptions Cspitzer_formula_pos.
+Print Assumptions lnLambda_ion_reactor_value.
+Print Assumptions sikora_weller_maxwellian_reactivity_pos.
+Print Assumptions synchrotron_B_scaling.
+Print Assumptions hora_max_enhancement.
+Print Assumptions all_pairs_subcritical.
+Print Assumptions R_chain_total.
