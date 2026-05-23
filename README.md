@@ -98,6 +98,27 @@ two custom bridge lemmas `ex_RInt_scal_R` and `RInt_scal_R` that
 discharge the typeclass mismatch between Coquelicot's polymorphic
 `scal` over normed modules and Stdlib's `Rmult`.
 
+**Linear-integrated instantiation (`LinearIntegralParams` and
+`LinearIntegralSettlement`) in `theories/pb_avalanche_integral.v`.**
+A sixth concrete instantiation with a non-constant knock-on cross
+section `sigma(E) = sigma_max * E / E_birth` and a uniform alpha
+distribution. The alpha-weighted velocity integral is defined as a
+literal ratio of Coquelicot integrals (numerator with the linear
+integrand, denominator with the constant `1/E_birth`) and its
+closed-form value `sigma_max * v_max / 2` is derived rather than
+asserted, via the polynomial integration primitive
+
+  `RInt_id_0_b : RInt (fun x => x) 0 b = b * b / 2`
+
+which is itself proved via Coquelicot's fundamental theorem of
+calculus `RInt_Derive` with antiderivative `F(x) = x*x/2`, the
+derivative computation built from `Derive.is_derive_mult` (product
+rule for `(x*x)' = 2x`) and `is_derive_scal_l` (constant rescaling
+by `1/2`). The proof of `linear_integrand_RInt` then factors the
+constant prefactor out of the linear integrand via `RInt_scal_R`,
+applies `RInt_id_0_b`, and discharges the remaining algebra with
+`field`.
+
 ## Quantitative bounds
 
 The composite figure-of-merit upper bound evaluates to explicit
@@ -105,10 +126,12 @@ rationals in each concrete instantiation:
 
 | Instantiation | `FoM_max_reactor` | Safety margin |
 |---|---|---|
-| `ConcreteSettlement`  | `3 / 100`                | `M(s) <= 3/100`, so `1 - M(s) >= 97/100` |
-| `PhysicalSettlement`  | `3 / 10^13`              | `M(s) <= 10^-12` |
-| `SaturatedSettlement` | `3 / 100`                | `M(s) <= 3/100` |
-| `IntegralSettlement`  | `3 / 100`                | `M(s) <= 3/100` |
+| `ConcreteSettlement`           | `3 / 100`     | `M(s) <= 3/100`, so `1 - M(s) >= 97/100` |
+| `PhysicalSettlement`           | `3 / 10^13`   | `M(s) <= 10^-12` |
+| `SaturatedSettlement`          | `3 / 100`     | `M(s) <= 3/100` |
+| `LinearCrossSectionSettlement` | `3 / 100`     | `M(s) <= 3/100` |
+| `IntegralSettlement`           | `3 / 100`     | `M(s) <= 3/100` |
+| `LinearIntegralSettlement`     | `3 / 100`     | `M(s) <= 3/100` |
 
 For the physical-scale instantiation the multiplication factor stays
 at least thirteen orders of magnitude below the avalanche threshold
@@ -129,9 +152,10 @@ throughout its regime.
 ## Axiom footprint
 
 Every theorem in `ConcreteSettlement`, `PhysicalSettlement`,
-`SaturatedSettlement`, and `IntegralSettlement` closes by `Qed` and
-depends only on the three Stdlib foundational axioms underlying the
-real numbers:
+`SaturatedSettlement`, `LinearCrossSectionSettlement`,
+`IntegralSettlement`, and `LinearIntegralSettlement` closes by `Qed`
+and depends only on the three Stdlib foundational axioms underlying
+the real numbers:
 
 - `ClassicalDedekindReals.sig_forall_dec`
 - `ClassicalDedekindReals.sig_not_dec`
@@ -167,16 +191,17 @@ from this formalization. The three closed-form physical identities
 (Spitzer-Trubnikov slowing-down time, slowing-down Fokker-Planck
 equilibrium, bilinear kinetic decomposition of the secondary rate)
 are encoded as Coq `Definition`s and so hold definitionally inside
-the framework functor. The velocity-weighted integral bound is the
-one closed-form identity that the `IntegralSettlement` derives from
-first principles in Coq via Coquelicot's Riemann integral
-monotonicity; the abstract `alpha_weighted_integral_uniform_bound`
-axiom of `PB_AVALANCHE_PARAMS` is discharged by reflexivity on the
-literal value of the integral ratio under the chosen constant
-cross-section and velocity. Extending this same treatment to
-non-constant cross sections or non-uniform alpha distributions is
-mechanical given Coquelicot's API and the bridge lemmas
-`ex_RInt_scal_R` / `RInt_scal_R` already provided.
+the framework functor. The velocity-weighted integral bound is
+derived from first principles in Coq via Coquelicot's Riemann
+integral: the constant integrand case in `IntegralSettlement` uses
+`RInt_const`, and the linear-cross-section case in
+`LinearIntegralSettlement` uses the polynomial integration primitive
+`RInt_id_0_b` built from `Derive.is_derive_mult` and
+`is_derive_scal_l` plus `RInt_Derive` (fundamental theorem of
+calculus). Both cases discharge the abstract
+`alpha_weighted_integral_uniform_bound` axiom of
+`PB_AVALANCHE_PARAMS` from the evaluated integral value rather than
+asserting it.
 
 ## What this settles
 
