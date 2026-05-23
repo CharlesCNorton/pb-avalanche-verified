@@ -99,6 +99,9 @@ Print Assumptions saturated_FoM_max_value.
 Print Assumptions saturated_FoM_max_loose.
 Print Assumptions saturated_FoM_loose_ratio.
 Print Assumptions saturated_M_max_achievable.
+Print Assumptions reactor_witness_safety_margin.
+Print Assumptions physical_witness_safety_margin.
+Print Assumptions saturated_corner_safety_margin.
 
 (* ================================================================== *)
 (* === pb_avalanche_integral.v — Coquelicot-derived bound + 2 more === *)
@@ -180,6 +183,7 @@ Print Assumptions hora_regime_no_avalanche.
 Print Assumptions iter_product_subcritical.
 Print Assumptions iter_witness_no_avalanche.
 Print Assumptions iter_witness_monotone_in_B.
+Print Assumptions iter_witness_safety_margin_positive.
 
 (* ================================================================== *)
 (* === pb_avalanche_thermal.v — Maxwellian-averaged reactivity === *)
@@ -254,6 +258,22 @@ Print Assumptions sikora_weller_pB_table_sorted.
 Print Assumptions sikora_weller_pB_integral.
 Print Assumptions sikora_weller_pB_integral_ext.
 Print Assumptions sikora_weller_M_inf_pos.
+Print Assumptions max_abs_v_nonneg.
+Print Assumptions interp_segment_sup_bound.
+Print Assumptions interp_linear_sup_bound.
+Print Assumptions max_abs_v_SW_value.
+Print Assumptions sikora_weller_sup_bound.
+Print Assumptions continuous_piecewise_at_strict.
+Print Assumptions continuous_piecewise_at_gt.
+Print Assumptions interp_linear_head_value.
+Print Assumptions interp_linear_last_value.
+Print Assumptions interp_linear_ext_continuous_left.
+Print Assumptions interp_linear_ext_continuous_right.
+Print Assumptions interp_linear_ext_continuous_zero_boundary.
+Print Assumptions pad_zeros_head_V.
+Print Assumptions last_V_app_cons.
+Print Assumptions pad_zeros_last_V.
+Print Assumptions interp_linear_ext_in_C0.
 Print Assumptions sikora_weller_M_2_pos.
 
 (* ================================================================== *)
@@ -429,6 +449,8 @@ Print Assumptions Q_value_ordering.
 Print Assumptions solar_no_avalanche.
 Print Assumptions solar_safety_margin.
 Print Assumptions SolarSettlement.hora_putvinski_settlement.
+Print Assumptions solar_witness_in_regime.
+Print Assumptions solar_witness_safety_margin.
 
 (* ================================================================== *)
 (* === pb_avalanche_constructive.v — classical-free subset === *)

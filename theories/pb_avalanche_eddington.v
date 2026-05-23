@@ -149,6 +149,42 @@ Theorem solar_safety_margin :
     0 < 1 - SolarSettlement.multiplication_factor s.
 Proof. exact SolarSettlement.reactor_safety_margin_positive. Qed.
 
+(* The exact safety margin at a representative solar plasma state.
+   SolarParams sets the alpha-weighted integral to 0, so M = 0
+   identically and the margin is exactly 1 (the maximum). *)
+
+Lemma swp_pos_np : (0 : R) < 100000000000000000000000000.    (* 10^26 cm^-3 *)
+Proof. lra. Qed.
+Lemma swp_pos_nB : (0 : R) < 1.                              (* placeholder *)
+Proof. lra. Qed.
+Lemma swp_pos_T  : (0 : R) < 1.                              (* ~ keV *)
+Proof. lra. Qed.
+Lemma swp_pos_B  : (0 : R) < 1.
+Proof. lra. Qed.
+
+Definition solar_witness_plasma : PlasmaState :=
+  mkPlasmaState 100000000000000000000000000 1 1 1
+                swp_pos_np swp_pos_nB swp_pos_T swp_pos_B.
+
+Lemma solar_witness_in_regime :
+  SolarSettlement.reactor_regime solar_witness_plasma.
+Proof.
+  unfold SolarSettlement.reactor_regime, SolarParams.n_B_max_reactor,
+         SolarParams.T_max_reactor, SolarParams.n_p_min_reactor.
+  simpl. split; [lra | split; lra].
+Qed.
+
+Theorem solar_witness_safety_margin :
+  1 - SolarSettlement.multiplication_factor solar_witness_plasma = 1.
+Proof.
+  unfold SolarSettlement.multiplication_factor,
+         SolarSettlement.R_secondary, SolarSettlement.R_primary.
+  simpl.
+  unfold SolarParams.alpha_weighted_secondary_velocity_integral,
+         SolarParams.sigma_v_pB_thermal.
+  field.
+Qed.
+
 (* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)

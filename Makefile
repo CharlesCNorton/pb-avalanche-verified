@@ -11,4 +11,7 @@ clean: Makefile.coq
 doc: Makefile.coq
 	$(MAKE) -f Makefile.coq html
 
-.PHONY: all clean doc
+audit-check: all
+	./scripts/check_axioms.sh
+
+.PHONY: all clean doc audit-check

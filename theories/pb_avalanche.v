@@ -1328,6 +1328,47 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Numerical safety-margin theorems at every named witness === *)
+(* === (item 5 of the third-generation deepening program) === *)
+(* ================================================================== *)
+
+(* For each named witness state, compute 1 - multiplication_factor as
+   an explicit closed-form rational. The ConcreteSettlement,
+   PhysicalSettlement, and SolarSettlement instances all set the
+   alpha-weighted integral to 0, so M = 0 and the safety margin is
+   exactly 1 (the maximum possible). The SaturatedSettlement corner
+   witness gives the tightest nonzero margin 2597/2600. *)
+
+Theorem reactor_witness_safety_margin :
+  1 - ConcreteSettlement.multiplication_factor reactor_witness_plasma = 1.
+Proof.
+  unfold ConcreteSettlement.multiplication_factor,
+         ConcreteSettlement.R_secondary, ConcreteSettlement.R_primary.
+  simpl.
+  unfold ConcreteParams.alpha_weighted_secondary_velocity_integral,
+         ConcreteParams.sigma_v_pB_thermal.
+  field.
+Qed.
+
+Theorem physical_witness_safety_margin :
+  1 - PhysicalSettlement.multiplication_factor physical_witness_plasma = 1.
+Proof.
+  unfold PhysicalSettlement.multiplication_factor,
+         PhysicalSettlement.R_secondary, PhysicalSettlement.R_primary.
+  simpl.
+  unfold PhysicalParams.alpha_weighted_secondary_velocity_integral,
+         PhysicalParams.sigma_v_pB_thermal.
+  field.
+Qed.
+
+Theorem saturated_corner_safety_margin :
+  1 - SaturatedSettlement.multiplication_factor saturated_corner_witness =
+    2597 / 2600.
+Proof.
+  rewrite saturated_corner_witness_M_value. field.
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 

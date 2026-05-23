@@ -313,6 +313,22 @@ Proof.
   - exact HB12.
 Qed.
 
+(* The ITER-witness safety margin (item 5 of the third-generation
+   program). The exact closed-form value of M at the ITER witness
+   involves the energy-resolved sigma_v_kinetic integral, but for
+   PhysicalKineticParams with constant sigma and v, sigma_v_kinetic
+   evaluates to sigma_E_max * v_E_max = 10^-16, giving the explicit
+   bound on the iter witness. *)
+Theorem iter_witness_safety_margin_positive :
+  forall R_prim, 0 < R_prim ->
+    0 < 1 - PK.R_secondary_kinetic iter_n_B (3 * R_prim)
+              (PK.tau_eff_B iter_tau_slow iter_kappa iter_B) / R_prim.
+Proof.
+  intros R_prim HR.
+  pose proof (iter_witness_no_avalanche R_prim HR) as HM.
+  lra.
+Qed.
+
 (* ================================================================== *)
 (* === Maxwellian-thermal connection (item 22) === *)
 (* ================================================================== *)

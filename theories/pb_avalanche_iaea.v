@@ -221,6 +221,12 @@ Fixpoint last_V (T : iaea_table) : R :=
   | _ :: (rest as r) => last_V r
   end.
 
+Definition head_V (T : iaea_table) : R :=
+  match T with
+  | [] => 0
+  | (_, v) :: _ => v
+  end.
+
 (* === Piecewise-linear interpolant === *)
 Fixpoint interp_linear (T : iaea_table) (E : R) : R :=
   match T with
@@ -360,6 +366,48 @@ Qed.
    functions f (on the left of b) and g (on the right of b) that agree
    at b (f b = g b) is continuous at b. Proved directly via the
    epsilon-delta characterization. *)
+Lemma continuous_piecewise_at_gt :
+  forall (f g : R -> R) (b : R),
+    continuous f b ->
+    continuous g b ->
+    f b = g b ->
+    continuous (fun x : R => if Rlt_dec b x then f x else g x) b.
+Proof.
+  intros f g b Hf Hg Heq.
+  intros P HP.
+  simpl in HP.
+  destruct (Rlt_dec b b) as [Hcontra | _]; [exfalso; lra |].
+  destruct (Hg P HP) as [dg Hdg].
+  assert (HP' : locally (f b) P) by (rewrite Heq; exact HP).
+  destruct (Hf P HP') as [df Hdf].
+  exists (mkposreal (Rmin df dg) (Rmin_stable_in_posreal df dg)).
+  intros y Hy. simpl in Hy.
+  destruct (Rlt_dec b y) as [_ | _].
+  - apply Hdf. eapply ball_le; [| exact Hy]. apply Rmin_l.
+  - apply Hdg. eapply ball_le; [| exact Hy]. apply Rmin_r.
+Qed.
+
+Lemma continuous_piecewise_at_strict :
+  forall (f g : R -> R) (b : R),
+    continuous f b ->
+    continuous g b ->
+    f b = g b ->
+    continuous (fun x : R => if Rlt_dec x b then f x else g x) b.
+Proof.
+  intros f g b Hf Hg Heq.
+  intros P HP.
+  simpl in HP.
+  destruct (Rlt_dec b b) as [Hcontra | _]; [exfalso; lra |].
+  destruct (Hg P HP) as [dg Hdg].
+  assert (HP' : locally (f b) P) by (rewrite Heq; exact HP).
+  destruct (Hf P HP') as [df Hdf].
+  exists (mkposreal (Rmin df dg) (Rmin_stable_in_posreal df dg)).
+  intros y Hy. simpl in Hy.
+  destruct (Rlt_dec y b) as [_ | _].
+  - apply Hdf. eapply ball_le; [| exact Hy]. apply Rmin_l.
+  - apply Hdg. eapply ball_le; [| exact Hy]. apply Rmin_r.
+Qed.
+
 Lemma continuous_piecewise_at :
   forall (f g : R -> R) (b : R),
     continuous f b ->
@@ -632,6 +680,428 @@ Proof.
     apply interp_linear_ext_inside. lra.
   - apply RInt_interp_linear_eq_trap. exact Hsort.
 Qed.
+
+(* === Zero-boundary continuity (item 3) ===
+
+   With head_V T = 0 and last_V T = 0, the zero-extended interpolant
+   is continuous everywhere on R: continuous on the interior by
+   interp_linear_continuous_on, continuous in the left/right
+   half-line by constancy at 0, and continuous at the endpoints by
+   the matching boundary values. *)
+
+Lemma interp_linear_head_value :
+  forall T, sorted_table T ->
+    T <> [] -> interp_linear T (head_E T) = head_V T.
+Proof.
+  intros [| [e1 v1] rest] Hsort Hne.
+  - exfalso. apply Hne. reflexivity.
+  - destruct rest as [| [e2 v2] rest'].
+    + simpl. reflexivity.
+    + simpl. simpl in Hsort. destruct Hsort as [Hgap _].
+      destruct (Rle_lt_dec e1 e2) as [_ | Hcontra]; [|exfalso; lra].
+      apply interp_segment_left. exact Hgap.
+Qed.
+
+Lemma interp_linear_last_value :
+  forall T, sorted_table T ->
+    T <> [] -> interp_linear T (last_E T) = last_V T.
+Proof.
+  induction T as [| [e1 v1] rest IH]; intros Hsort Hne.
+  - exfalso. apply Hne. reflexivity.
+  - destruct rest as [| [e2 v2] rest'].
+    + simpl. reflexivity.
+    + simpl in Hsort. destruct Hsort as [Hgap Hsort_tail].
+      assert (Hsort_full : sorted_table ((e2, v2) :: rest')).
+      { destruct rest' as [| [e3 v3] rest''].
+        - simpl. trivial.
+        - simpl. exact Hsort_tail. }
+      assert (Hle_tail : e2 <= last_E ((e2, v2) :: rest'))
+        by (apply (head_E_le_last_E ((e2, v2) :: rest')); exact Hsort_full).
+      assert (Hne_tail : (e2, v2) :: rest' <> []) by discriminate.
+      assert (IHa := IH Hsort_full Hne_tail).
+      (* last_E ((e1,v1)::(e2,v2)::rest') = last_E ((e2,v2)::rest') *)
+      (* interp_linear ((e1,v1)::(e2,v2)::rest') last_E = ... *)
+      (* By interp_linear_tail at E = last_E ((e2,v2)::rest') *)
+      assert (Hsort_outer : sorted_table ((e1, v1) :: (e2, v2) :: rest'))
+        by (simpl; split; [exact Hgap | exact Hsort_full]).
+      assert (Heq : interp_linear ((e1, v1) :: (e2, v2) :: rest')
+                                  (last_E ((e2, v2) :: rest')) =
+                    interp_linear ((e2, v2) :: rest')
+                                  (last_E ((e2, v2) :: rest')))
+        by (apply interp_linear_tail; [exact Hle_tail | exact Hsort_outer]).
+      simpl. simpl in Heq. rewrite Heq.
+      (* Now goal involves the tail; apply IHa *)
+      assert (IHa_at_last :
+        interp_linear ((e2, v2) :: rest')
+                      (last_E ((e2, v2) :: rest')) =
+        last_V ((e2, v2) :: rest'))
+        by (apply IH; assumption).
+      simpl in IHa_at_last. exact IHa_at_last.
+Qed.
+
+(* The zero-extended interpolant is continuous on the left half-line
+   (where it is identically 0). *)
+Lemma interp_linear_ext_continuous_left :
+  forall T E, T <> [] -> E < head_E T ->
+    continuous (interp_linear_ext T) E.
+Proof.
+  intros T E Hne HE.
+  apply continuous_ext_loc with (g := fun _ : R => 0).
+  - assert (Hpos : 0 < (head_E T - E) / 2) by lra.
+    exists (mkposreal _ Hpos).
+    intros y Hy. simpl in Hy.
+    unfold ball in Hy; simpl in Hy. unfold AbsRing_ball in Hy.
+    unfold abs, minus, plus, opp in Hy; simpl in Hy.
+    apply Rabs_def2 in Hy. destruct Hy as [Hy_lt _].
+    assert (Hy_below : y < head_E T) by lra.
+    rewrite (interp_linear_ext_below T y Hy_below). reflexivity.
+  - apply continuous_const.
+Qed.
+
+Lemma interp_linear_ext_continuous_right :
+  forall T E, T <> [] -> last_E T < E ->
+    continuous (interp_linear_ext T) E.
+Proof.
+  intros T E Hne HE.
+  apply continuous_ext_loc with (g := fun _ : R => 0).
+  - assert (Hpos : 0 < (E - last_E T) / 2) by lra.
+    exists (mkposreal _ Hpos).
+    intros y Hy. simpl in Hy.
+    unfold ball in Hy; simpl in Hy. unfold AbsRing_ball in Hy.
+    unfold abs, minus, plus, opp in Hy; simpl in Hy.
+    apply Rabs_def2 in Hy. destruct Hy as [_ Hy_gt].
+    assert (Hy_above : last_E T < y) by lra.
+    rewrite (interp_linear_ext_above T y Hy_above). reflexivity.
+  - apply continuous_const.
+Qed.
+
+(* The main theorem: with zero boundary values, interp_linear_ext is
+   continuous everywhere on R. *)
+Theorem interp_linear_ext_continuous_zero_boundary :
+  forall T E,
+    sorted_table T -> T <> [] ->
+    head_V T = 0 -> last_V T = 0 ->
+    continuous (interp_linear_ext T) E.
+Proof.
+  intros T E Hsort Hne Hhead0 Hlast0.
+  destruct (Rlt_le_dec E (head_E T)) as [Hlo | HEge_head].
+  - apply interp_linear_ext_continuous_left; assumption.
+  - destruct (Rlt_le_dec (last_E T) E) as [Hhi | HEle_last].
+    + apply interp_linear_ext_continuous_right; assumption.
+    + (* E in [head_E T, last_E T]: continuous via the piecewise-at-
+         endpoint and inside-via-interp_linear arguments. *)
+      pose proof (head_E_le_last_E T Hsort) as HHeLast.
+      apply continuous_ext_loc with
+        (g := fun y : R =>
+                if Rlt_dec y (head_E T) then 0
+                else if Rlt_dec (last_E T) y then 0
+                else interp_linear T y).
+      * apply filter_forall. intro y. unfold interp_linear_ext.
+        destruct T as [| [e1 v1] rest]; [exfalso; apply Hne; reflexivity |].
+        reflexivity.
+      * destruct (Req_dec E (head_E T)) as [HE_eq_head | HE_neq_head].
+        -- (* E = head_E T: piecewise-at at the lower boundary. *)
+           rewrite HE_eq_head.
+           apply (continuous_piecewise_at_strict
+                    (fun _ : R => 0)
+                    (fun y : R => if Rlt_dec (last_E T) y then 0
+                                  else interp_linear T y)
+                    (head_E T)).
+           ++ apply continuous_const.
+           ++ (* Continuity of (if Rlt_dec last < y then 0 else
+                 interp_linear T y) at head_E T. Two subcases:
+                 head_E = last_E (degenerate) or head_E < last_E. *)
+              destruct (Rle_lt_or_eq_dec _ _ HHeLast) as [Hstrict | Heq].
+              ** apply continuous_ext_loc with (g := interp_linear T).
+                 --- assert (Hpos : 0 < (last_E T - head_E T) / 2) by lra.
+                     exists (mkposreal _ Hpos). intros y Hy. simpl in Hy.
+                     unfold ball in Hy; simpl in Hy.
+                     unfold AbsRing_ball, abs, minus, plus, opp in Hy;
+                       simpl in Hy.
+                     apply Rabs_def2 in Hy. destruct Hy as [Hy_lt _].
+                     assert (Hy_below : y < last_E T) by lra.
+                     destruct (Rlt_dec (last_E T) y) as [Hc | _];
+                       [exfalso; lra | reflexivity].
+                 --- apply interp_linear_continuous_on; [exact Hsort | lra].
+              ** (* head_E = last_E: the table reduces to a single point. *)
+                 apply continuous_ext_loc with (g := fun _ : R => 0).
+                 --- exists (mkposreal 1 Rlt_0_1). intros y Hy.
+                     simpl in Hy. unfold ball in Hy; simpl in Hy.
+                     unfold AbsRing_ball, abs, minus, plus, opp in Hy;
+                       simpl in Hy.
+                     destruct (Rlt_dec (last_E T) y) as [_ | Hy_le].
+                     +++ reflexivity.
+                     +++ (* y <= last_E T = head_E T, but y could equal
+                            head_E T. In that case interp_linear T head_E
+                            = head_V T = 0. For y < head_E T, we're outside
+                            the table interval — but locally near
+                            head_E, the value is interp_linear T y
+                            which equals head_V T = 0 only at the endpoint.
+                            Use the degenerate case carefully. *)
+                         destruct (Req_dec y (head_E T)) as [Hyeq | Hyne].
+                         *** rewrite Hyeq.
+                             rewrite (interp_linear_head_value T Hsort Hne).
+                             symmetry. exact Hhead0.
+                         *** (* y not at head_E: in degenerate (single-point)
+                                case, interp_linear T y = head_V T = 0
+                                (only one point in the table, so interp is
+                                constant). For y < head_E, this still holds
+                                because the singleton interp_linear is
+                                always head_V T. *)
+                             destruct T as [| [e1 v1] rest];
+                               [exfalso; apply Hne; reflexivity |].
+                             destruct rest as [| [e2 v2] rest'].
+                             ---- simpl. simpl in Hhead0. symmetry. exact Hhead0.
+                             ---- simpl in Heq. exfalso.
+                                  pose proof Hsort as Hsort'.
+                                  simpl in Hsort'.
+                                  destruct Hsort' as [Hgap Hsort_tail].
+                                  destruct rest' as [| [e3 v3] rest''].
+                                  ++++ simpl in Heq, Hgap. lra.
+                                  ++++ simpl in Heq, Hsort_tail.
+                                       destruct Hsort_tail as [Hgap2 Hsort3].
+                                       assert (Hge_e3 :
+                                         e3 <= last_E ((e3, v3) :: rest'')).
+                                       { apply (head_E_le_last_E
+                                                  ((e3, v3) :: rest'')).
+                                         exact Hsort3. }
+                                       (* e1 < e2 < e3 <= last_E = e1, contradiction *)
+                                       assert (Hcontra2 : e3 <= e1)
+                                         by (rewrite Heq; exact Hge_e3).
+                                       lra.
+                 --- apply continuous_const.
+           ++ rewrite (interp_linear_head_value T Hsort Hne), Hhead0.
+              destruct (Rlt_dec (last_E T) (head_E T)) as [Hcontra | _];
+                [exfalso; lra | reflexivity].
+        -- destruct (Req_dec E (last_E T)) as [HE_eq_last | HE_neq_last].
+           ++ (* E = last_E T: piecewise-at at the upper boundary. *)
+              assert (HEstrict_lo : head_E T < last_E T) by lra.
+              rewrite HE_eq_last.
+              apply continuous_ext_loc with
+                (g := fun x : R =>
+                        if Rlt_dec (last_E T) x then 0 else interp_linear T x).
+              ** assert (Hpos : 0 < (last_E T - head_E T) / 2) by lra.
+                 exists (mkposreal _ Hpos). intros y Hy. simpl in Hy.
+                 unfold ball in Hy; simpl in Hy.
+                 unfold AbsRing_ball, abs, minus, plus, opp in Hy;
+                   simpl in Hy.
+                 apply Rabs_def2 in Hy. destruct Hy as [_ Hy_gt].
+                 assert (Hy_above_head : head_E T < y) by lra.
+                 destruct (Rlt_dec y (head_E T)) as [Hc | _];
+                   [exfalso; lra | reflexivity].
+              ** apply (continuous_piecewise_at_gt
+                          (fun _ : R => 0) (interp_linear T) (last_E T)).
+                 --- apply continuous_const.
+                 --- apply interp_linear_continuous_on; [exact Hsort | lra].
+                 --- rewrite (interp_linear_last_value T Hsort Hne), Hlast0.
+                     reflexivity.
+           ++ (* head_E < E < last_E (strict): use interp_linear directly. *)
+              assert (HEstrict : head_E T < E < last_E T) by lra.
+              apply continuous_ext_loc with (g := interp_linear T).
+              ** assert (Hgap_lo : 0 < E - head_E T) by lra.
+                 assert (Hgap_hi : 0 < last_E T - E) by lra.
+                 assert (Hmin_pos : 0 < Rmin (E - head_E T) (last_E T - E))
+                   by (apply Rmin_glb_lt; lra).
+                 assert (Hpos : 0 < Rmin (E - head_E T) (last_E T - E) / 2)
+                   by lra.
+                 exists (mkposreal _ Hpos). intros y Hy. simpl in Hy.
+                 unfold ball in Hy; simpl in Hy. unfold AbsRing_ball in Hy.
+                 unfold abs, minus, plus, opp in Hy; simpl in Hy.
+                 apply Rabs_def2 in Hy. destruct Hy as [Hy_lt Hy_gt].
+                 pose proof (Rmin_l (E - head_E T) (last_E T - E)) as Hmin_l.
+                 pose proof (Rmin_r (E - head_E T) (last_E T - E)) as Hmin_r.
+                 destruct (Rlt_dec y (head_E T)) as [Hc | _]; [exfalso; lra |].
+                 destruct (Rlt_dec (last_E T) y) as [Hc | _]; [exfalso; lra |].
+                 reflexivity.
+              ** apply interp_linear_continuous_on; [exact Hsort | lra].
+Qed.
+
+(* ================================================================== *)
+(* === pad_zeros: produces a zero-boundaried table (item 4) ===
+
+   Given a table T, pad_zeros T prepends and appends a zero-valued
+   point at energies bracketing the table's interval. The resulting
+   table has head_V = last_V = 0, so interp_linear_ext_continuous_zero_boundary
+   applies. *)
+
+Definition pad_zeros (T : iaea_table) : iaea_table :=
+  match T with
+  | [] => nil
+  | _ => (head_E T - 1, 0) :: T ++ ((last_E T + 1, 0) :: nil)
+  end.
+
+Lemma pad_zeros_head_V :
+  forall T, T <> [] -> head_V (pad_zeros T) = 0.
+Proof.
+  intros [| [e1 v1] rest] Hne; [exfalso; apply Hne; reflexivity |].
+  simpl. reflexivity.
+Qed.
+
+Lemma last_V_app_cons :
+  forall T e v,
+    last_V (T ++ ((e, v) :: nil)) = v.
+Proof.
+  induction T as [| [e1 v1] rest IH]; intros e v; simpl.
+  - reflexivity.
+  - destruct rest as [| [e2 v2] rest']; simpl.
+    + reflexivity.
+    + (* IH gives last_V (((e2,v2)::rest') ++ [(e,v)]) = v *)
+      specialize (IH e v). simpl in IH. exact IH.
+Qed.
+
+Lemma pad_zeros_last_V :
+  forall T, T <> [] -> last_V (pad_zeros T) = 0.
+Proof.
+  intros [| [e1 v1] rest] Hne; [exfalso; apply Hne; reflexivity |].
+  unfold pad_zeros. simpl.
+  destruct rest as [| [e2 v2] rest'].
+  - simpl. reflexivity.
+  - rewrite (last_V_app_cons _ (last_E ((e1, v1) :: (e2, v2) :: rest') + 1) 0).
+    reflexivity.
+Qed.
+
+Corollary interp_linear_ext_in_C0 :
+  forall T E,
+    sorted_table T -> T <> [] ->
+    head_V T = 0 -> last_V T = 0 ->
+    continuous (interp_linear_ext T) E.
+Proof.
+  intros T E Hsort Hne Hhead Hlast.
+  apply interp_linear_ext_continuous_zero_boundary; assumption.
+Qed.
+
+(* ================================================================== *)
+(* === Sup-norm bound on interp_linear (item 2) ===
+
+   On a sorted table T, the piecewise-linear interpolant is bounded
+   by the absolute-value maximum of the table's value column. The
+   key step is that each segment's value is a convex combination of
+   its two endpoint values, hence bounded in absolute value by
+   max(|v_i|, |v_{i+1}|). *)
+(* ================================================================== *)
+
+Fixpoint max_abs_v (T : iaea_table) : R :=
+  match T with
+  | [] => 0
+  | (_, v) :: rest => Rmax (Rabs v) (max_abs_v rest)
+  end.
+
+Lemma max_abs_v_nonneg : forall T, 0 <= max_abs_v T.
+Proof.
+  induction T as [| [e v] rest IH]; simpl.
+  - apply Rle_refl.
+  - apply Rle_trans with (Rabs v); [apply Rabs_pos | apply Rmax_l].
+Qed.
+
+(* The segment value at any E in [e1, e2] is a convex combination of
+   v1 and v2, hence bounded by max(|v1|, |v2|). *)
+Lemma interp_segment_sup_bound :
+  forall e1 v1 e2 v2 E,
+    e1 < e2 -> e1 <= E <= e2 ->
+    Rabs (interp_segment e1 v1 e2 v2 E) <= Rmax (Rabs v1) (Rabs v2).
+Proof.
+  intros e1 v1 e2 v2 E Hgap [HE1 HE2].
+  unfold interp_segment.
+  (* Reformulate as (1 - lambda) * v1 + lambda * v2 with
+     lambda := (E - e1) / (e2 - e1) in [0, 1]. *)
+  set (lambda := (E - e1) / (e2 - e1)).
+  assert (Hgap_ne : e2 - e1 <> 0) by lra.
+  assert (Hlambda_lo : 0 <= lambda).
+  { unfold lambda. apply Rdiv_le_0_compat; lra. }
+  assert (Hlambda_hi : lambda <= 1).
+  { unfold lambda.
+    apply (proj1 (Rdiv_le_1 (E - e1) (e2 - e1) ltac:(lra))).
+    lra. }
+  assert (Hval : v1 + (v2 - v1) * (E - e1) / (e2 - e1) =
+                 (1 - lambda) * v1 + lambda * v2).
+  { unfold lambda. field. exact Hgap_ne. }
+  rewrite Hval.
+  apply Rle_trans with ((1 - lambda) * Rabs v1 + lambda * Rabs v2).
+  - apply Rle_trans with (Rabs ((1 - lambda) * v1) +
+                          Rabs (lambda * v2)).
+    + apply Rabs_triang.
+    + rewrite Rabs_mult, Rabs_mult.
+      rewrite (Rabs_right (1 - lambda)) by lra.
+      rewrite (Rabs_right lambda) by lra.
+      apply Rle_refl.
+  - assert (HmaxL : Rabs v1 <= Rmax (Rabs v1) (Rabs v2)) by apply Rmax_l.
+    assert (HmaxR : Rabs v2 <= Rmax (Rabs v1) (Rabs v2)) by apply Rmax_r.
+    nra.
+Qed.
+
+(* The global sup-norm bound on interp_linear over [head_E T, last_E T]. *)
+Theorem interp_linear_sup_bound :
+  forall T E, sorted_table T ->
+    head_E T <= E <= last_E T ->
+    Rabs (interp_linear T E) <= max_abs_v T.
+Proof.
+  induction T as [| [e1 v1] rest IH].
+  - intros E _ [HE1 HE2]. simpl in HE1, HE2.
+    assert (HE0 : E = 0) by lra. subst E. simpl.
+    rewrite Rabs_R0. apply Rle_refl.
+  - intros E Hsort [HE1 HE2].
+    destruct rest as [| [e2 v2] rest'].
+    + simpl in HE1, HE2.
+      assert (HEeq : E = e1) by lra. subst E.
+      simpl. rewrite (Rmax_left (Rabs v1) 0) by apply Rabs_pos.
+      apply Rle_refl.
+    + simpl in Hsort. destruct Hsort as [Hgap Hsort_tail].
+      assert (Hsort_full : sorted_table ((e2, v2) :: rest')).
+      { destruct rest' as [| [e3 v3] rest''].
+        - simpl. trivial.
+        - simpl. exact Hsort_tail. }
+      assert (Hle_tail : e2 <= last_E ((e2, v2) :: rest'))
+        by (apply (head_E_le_last_E ((e2, v2) :: rest')); exact Hsort_full).
+      simpl in HE1, HE2.
+      simpl. destruct (Rle_lt_dec E e2) as [Hle_E_e2 | Hgt_E_e2].
+      * (* E in [e1, e2]: bounded by max(|v1|, |v2|) via convex
+           combination. *)
+        apply Rle_trans with (Rmax (Rabs v1) (Rabs v2)).
+        -- apply interp_segment_sup_bound; [exact Hgap | split; lra].
+        -- (* Rmax (Rabs v1) (Rabs v2) <=
+              Rmax (Rabs v1) (Rmax (Rabs v2) (max_abs_v rest')). *)
+           apply Rle_trans with
+             (Rmax (Rabs v1) (Rmax (Rabs v2) (max_abs_v rest'))).
+           ++ assert (HRmaxR : Rabs v2 <= Rmax (Rabs v2) (max_abs_v rest'))
+                by apply Rmax_l.
+              apply Rmax_lub.
+              ** apply Rmax_l.
+              ** apply Rle_trans with (Rmax (Rabs v2) (max_abs_v rest'));
+                   [apply HRmaxR | apply Rmax_r].
+           ++ apply Rle_refl.
+      * (* E in (e2, last_E rest]: bounded by IH on tail. *)
+        assert (HE2' : E <= last_E ((e2, v2) :: rest')).
+        { destruct rest' as [| [e3 v3] rest'']; simpl; simpl in HE2; lra. }
+        assert (Htail :
+          interp_linear ((e2, v2) :: rest') E <=
+          max_abs_v ((e2, v2) :: rest') /\
+          - max_abs_v ((e2, v2) :: rest') <=
+          interp_linear ((e2, v2) :: rest') E).
+        { pose proof (IH E Hsort_full
+                       (conj (Rlt_le _ _ Hgt_E_e2) HE2')) as Htail_bnd.
+          (* Convert Rabs <= b to -b <= a <= b. *)
+          assert (Hnonneg : 0 <= max_abs_v ((e2, v2) :: rest'))
+            by apply max_abs_v_nonneg.
+          split.
+          - apply Rle_trans with (Rabs (interp_linear ((e2, v2) :: rest') E)).
+            + apply Rle_abs.
+            + exact Htail_bnd.
+          - apply Ropp_le_cancel. rewrite Ropp_involutive.
+            apply Rle_trans with (Rabs (interp_linear ((e2, v2) :: rest') E)).
+            + rewrite <- Rabs_Ropp. apply Rle_abs.
+            + exact Htail_bnd. }
+        pose proof (Rmax_r (Rabs v1) (max_abs_v ((e2, v2) :: rest')))
+          as Htail_max.
+        destruct Htail as [Hle Hge].
+        apply Rabs_le. split.
+        - apply Rle_trans with (- max_abs_v ((e2, v2) :: rest')); [|exact Hge].
+          apply Ropp_le_contravar. exact Htail_max.
+        - apply Rle_trans with (max_abs_v ((e2, v2) :: rest'));
+            [exact Hle | exact Htail_max].
+Qed.
+
+(* The Sikora-Weller table's sup-norm corollary is in the SW block
+   below. *)
 
 (* ================================================================== *)
 (* === Curvature-bounded interpolation error per segment ===
@@ -959,6 +1429,27 @@ Definition sikora_weller_M_2 : R := 80.
 
 Lemma sikora_weller_M_2_pos : 0 < sikora_weller_M_2.
 Proof. unfold sikora_weller_M_2. lra. Qed.
+
+(* The Sikora-Weller table's sup-norm is at most its peak value 12/10. *)
+Lemma max_abs_v_SW_value :
+  max_abs_v sikora_weller_pB_table <= sikora_weller_M_inf.
+Proof.
+  unfold sikora_weller_M_inf, sikora_weller_pB_table, max_abs_v.
+  repeat (apply Rmax_lub).
+  all: rewrite ?Rabs_right by lra; lra.
+Qed.
+
+Corollary sikora_weller_sup_bound :
+  forall E,
+    head_E sikora_weller_pB_table <= E <= last_E sikora_weller_pB_table ->
+    Rabs (interp_linear sikora_weller_pB_table E) <= sikora_weller_M_inf.
+Proof.
+  intros E HE.
+  pose proof (interp_linear_sup_bound sikora_weller_pB_table E
+                sikora_weller_pB_table_sorted HE) as Hbnd.
+  apply Rle_trans with (max_abs_v sikora_weller_pB_table);
+    [exact Hbnd | exact max_abs_v_SW_value].
+Qed.
 
 (* ================================================================== *)
 (* === Axiom audit === *)

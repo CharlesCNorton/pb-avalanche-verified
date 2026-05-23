@@ -15,4 +15,5 @@ Makefile.coq.conf
 .coqdoc.d
 .lia.cache
 .nia.cache
+.nra.cache
 html/
