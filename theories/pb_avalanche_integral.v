@@ -488,3 +488,190 @@ Proof.
 Qed.
 
 Print Assumptions linear_integrand_RInt.
+
+(* ================================================================== *)
+(* === Linear-cross-section instantiation via integration === *)
+(* ================================================================== *)
+
+(* LinearIntegralParams: same kinetic data as the LinearCrossSectionParams
+   in the main file (linear knock-on cross section, uniform alpha
+   distribution), but the alpha-weighted velocity integral is defined
+   as a literal ratio of Coquelicot RInts and the bound is derived
+   via linear_integrand_RInt rather than asserted. *)
+
+Module LinearIntegralParams <: PB_AVALANCHE_PARAMS.
+
+  Definition sigma_v_pB_thermal : R -> R := fun _ => 1.
+
+  Lemma sigma_v_pB_thermal_positive :
+    forall T, 0 < T -> 0 < sigma_v_pB_thermal T.
+  Proof. intros. unfold sigma_v_pB_thermal. lra. Qed.
+
+  Definition sigma_knockon_max : R := 1 / 10000000.
+
+  Lemma sigma_knockon_max_positive : 0 < sigma_knockon_max.
+  Proof. unfold sigma_knockon_max. lra. Qed.
+
+  Lemma E_alpha_birth_pos_li : 0 < E_alpha_birth_MeV.
+  Proof. unfold E_alpha_birth_MeV, Q_pB_MeV. lra. Qed.
+
+  Lemma E_alpha_birth_neq_li : E_alpha_birth_MeV <> 0.
+  Proof. apply Rgt_not_eq. exact E_alpha_birth_pos_li. Qed.
+
+  Definition sigma_alpha_p_knockon : CrossSection :=
+    fun E => sigma_knockon_max * E / E_alpha_birth_MeV.
+
+  Lemma sigma_alpha_p_knockon_nonneg :
+    forall E, 0 <= E -> 0 <= sigma_alpha_p_knockon E.
+  Proof.
+    intros E HE. unfold sigma_alpha_p_knockon.
+    apply Rmult_le_pos.
+    - apply Rmult_le_pos.
+      + apply Rlt_le, sigma_knockon_max_positive.
+      + exact HE.
+    - apply Rlt_le, Rinv_0_lt_compat, E_alpha_birth_pos_li.
+  Qed.
+
+  Lemma sigma_alpha_p_knockon_uniform_bound :
+    forall E, 0 <= E <= E_alpha_birth_MeV ->
+      sigma_alpha_p_knockon E <= sigma_knockon_max.
+  Proof.
+    intros E [HE0 HE1]. unfold sigma_alpha_p_knockon.
+    pose proof E_alpha_birth_pos_li as Hbirth.
+    pose proof sigma_knockon_max_positive as Hsig.
+    apply Rmult_le_reg_r with E_alpha_birth_MeV; [exact Hbirth |].
+    unfold Rdiv. rewrite Rmult_assoc, Rinv_l; [|exact E_alpha_birth_neq_li].
+    rewrite Rmult_1_r.
+    apply Rmult_le_compat_l; [lra | exact HE1].
+  Qed.
+
+  Definition v_alpha_max : R := 10000.
+
+  Lemma v_alpha_max_positive : 0 < v_alpha_max.
+  Proof. unfold v_alpha_max. lra. Qed.
+
+  Definition Cspitzer : R := 1 / 100.
+
+  Lemma Cspitzer_positive : 0 < Cspitzer.
+  Proof. unfold Cspitzer. lra. Qed.
+
+  (* The denominator integral: RInt (fun _ => / E_birth) 0 E_birth = 1. *)
+  Lemma RInt_inv_E_birth :
+    RInt (fun _ : R => / E_alpha_birth_MeV) 0 E_alpha_birth_MeV = 1.
+  Proof.
+    pose proof E_alpha_birth_pos_li as Hbirth.
+    rewrite RInt_const.
+    unfold scal; simpl. unfold mult; simpl.
+    rewrite Rminus_0_r. apply Rinv_r. exact E_alpha_birth_neq_li.
+  Qed.
+
+  (* Alpha-weighted velocity integral as a literal ratio of RInts. *)
+  Definition alpha_weighted_secondary_velocity_integral
+    (_ : PlasmaState) : R :=
+    RInt (fun E : R => / E_alpha_birth_MeV *
+                       (sigma_knockon_max * E / E_alpha_birth_MeV) *
+                       v_alpha_max) 0 E_alpha_birth_MeV /
+    RInt (fun _ : R => / E_alpha_birth_MeV) 0 E_alpha_birth_MeV.
+
+  Lemma alpha_weighted_integral_value :
+    forall s, alpha_weighted_secondary_velocity_integral s =
+              sigma_knockon_max * v_alpha_max / 2.
+  Proof.
+    intros s.
+    unfold alpha_weighted_secondary_velocity_integral.
+    rewrite linear_integrand_RInt, RInt_inv_E_birth.
+    field.
+  Qed.
+
+  Lemma alpha_weighted_integral_nonneg :
+    forall s, 0 <= alpha_weighted_secondary_velocity_integral s.
+  Proof.
+    intros s. rewrite alpha_weighted_integral_value.
+    pose proof sigma_knockon_max_positive.
+    pose proof v_alpha_max_positive.
+    assert (0 <= sigma_knockon_max * v_alpha_max)
+      by (apply Rmult_le_pos; lra).
+    lra.
+  Qed.
+
+  Lemma alpha_weighted_integral_uniform_bound :
+    forall s, alpha_weighted_secondary_velocity_integral s <=
+              sigma_knockon_max * v_alpha_max.
+  Proof.
+    intros s. rewrite alpha_weighted_integral_value.
+    pose proof sigma_knockon_max_positive.
+    pose proof v_alpha_max_positive.
+    assert (0 <= sigma_knockon_max * v_alpha_max)
+      by (apply Rmult_le_pos; lra).
+    lra.
+  Qed.
+
+  Definition n_B_max_reactor : R := 100.
+  Definition T_max_reactor   : R := 100.
+  Definition n_p_min_reactor : R := 100.
+
+  Lemma n_B_max_reactor_positive : 0 < n_B_max_reactor.
+  Proof. unfold n_B_max_reactor. lra. Qed.
+  Lemma T_max_reactor_positive : 0 < T_max_reactor.
+  Proof. unfold T_max_reactor. lra. Qed.
+  Lemma n_p_min_reactor_positive : 0 < n_p_min_reactor.
+  Proof. unfold n_p_min_reactor. lra. Qed.
+
+  Lemma sqrt_100_eq_10_li : sqrt 100 = 10.
+  Proof.
+    apply Rsqr_inj.
+    - apply sqrt_pos.
+    - lra.
+    - rewrite Rsqr_sqrt by lra.
+      unfold Rsqr. ring.
+  Qed.
+
+  Lemma reactor_subcritical_axiom :
+    3 * n_B_max_reactor *
+    (Cspitzer * T_max_reactor * sqrt T_max_reactor / n_p_min_reactor) *
+    sigma_knockon_max * v_alpha_max < 1.
+  Proof.
+    unfold n_B_max_reactor, Cspitzer, T_max_reactor, n_p_min_reactor,
+           sigma_knockon_max, v_alpha_max.
+    rewrite sqrt_100_eq_10_li.
+    field_simplify.
+    lra.
+  Qed.
+
+End LinearIntegralParams.
+
+Module LinearIntegralSettlement := PBAvalancheFramework LinearIntegralParams.
+
+Print Assumptions LinearIntegralSettlement.hora_putvinski_settlement.
+Print Assumptions LinearIntegralSettlement.reactor_no_multiplication.
+Print Assumptions LinearIntegralParams.alpha_weighted_integral_value.
+Print Assumptions LinearIntegralParams.alpha_weighted_integral_uniform_bound.
+
+(* Six-settlement meta-theorem: the same conclusion holds for all six
+   concrete instantiations, including the LinearIntegralSettlement
+   that derives its alpha-weighted velocity integral from actual
+   Coquelicot polynomial integration via RInt_id_0_b. *)
+
+Theorem all_six_settlements_subcritical :
+  (forall s, ConcreteSettlement.reactor_regime s ->
+             ConcreteSettlement.multiplication_factor s < 1) /\
+  (forall s, PhysicalSettlement.reactor_regime s ->
+             PhysicalSettlement.multiplication_factor s < 1) /\
+  (forall s, SaturatedSettlement.reactor_regime s ->
+             SaturatedSettlement.multiplication_factor s < 1) /\
+  (forall s, LinearCrossSectionSettlement.reactor_regime s ->
+             LinearCrossSectionSettlement.multiplication_factor s < 1) /\
+  (forall s, IntegralSettlement.reactor_regime s ->
+             IntegralSettlement.multiplication_factor s < 1) /\
+  (forall s, LinearIntegralSettlement.reactor_regime s ->
+             LinearIntegralSettlement.multiplication_factor s < 1).
+Proof.
+  split; [exact ConcreteSettlement.reactor_no_multiplication |].
+  split; [exact PhysicalSettlement.reactor_no_multiplication |].
+  split; [exact SaturatedSettlement.reactor_no_multiplication |].
+  split; [exact LinearCrossSectionSettlement.reactor_no_multiplication |].
+  split; [exact IntegralSettlement.reactor_no_multiplication |].
+  exact LinearIntegralSettlement.reactor_no_multiplication.
+Qed.
+
+Print Assumptions all_six_settlements_subcritical.
