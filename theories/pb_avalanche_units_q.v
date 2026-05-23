@@ -234,10 +234,80 @@ Proof.
   repeat split; rewrite inject_Z_plus; reflexivity.
 Qed.
 
+(* === Item 18: full Q-exponent powers and roots === *)
+
+(* Multiplication of exponents: (u^m)^n = u^(m*n). *)
+Lemma unit_pow_q_mul :
+  forall u m n,
+    UnitQ_eq (unit_pow_q (unit_pow_q u m) n)
+             (unit_pow_q u (m * n)).
+Proof.
+  intros [a b c d e f] m n.
+  unfold UnitQ_eq, unit_pow_q. simpl.
+  repeat split; ring.
+Qed.
+
+(* Powers preserve unit_mul_q: (u * v)^n = u^n * v^n. *)
+Lemma unit_pow_q_mul_distr :
+  forall u v n,
+    UnitQ_eq (unit_pow_q (unit_mul_q u v) n)
+             (unit_mul_q (unit_pow_q u n) (unit_pow_q v n)).
+Proof.
+  intros [a1 b1 c1 d1 e1 f1] [a2 b2 c2 d2 e2 f2] n.
+  unfold UnitQ_eq, unit_pow_q, unit_mul_q. simpl.
+  repeat split; ring.
+Qed.
+
+(* Negation of exponent equals inverse: u^(-n) = (u^n)^{-1}. *)
+Lemma unit_pow_q_neg :
+  forall u n,
+    UnitQ_eq (unit_pow_q u (- n))
+             (unit_inv_q (unit_pow_q u n)).
+Proof.
+  intros [a b c d e f] n.
+  unfold UnitQ_eq, unit_pow_q, unit_inv_q. simpl.
+  repeat split; ring.
+Qed.
+
+(* nth root via 1/n exponent. *)
+Definition nth_root_unit (u : UnitQ) (n : positive) : UnitQ :=
+  unit_pow_q u (1 # n).
+
+(* The nth root, raised to the nth power, recovers u (up to UnitQ_eq). *)
+Lemma nth_root_unit_pow :
+  forall u n,
+    UnitQ_eq (unit_pow_q (nth_root_unit u n) (Z.pos n # 1)) u.
+Proof.
+  intros [a b c d e f] n.
+  unfold UnitQ_eq, unit_pow_q, nth_root_unit. simpl.
+  assert (H : (Z.pos n # 1) * (1 # n) == 1).
+  { unfold Qmult, Qeq. simpl. lia. }
+  repeat split.
+  - rewrite Qmult_assoc, H. apply Qmult_1_l.
+  - rewrite Qmult_assoc, H. apply Qmult_1_l.
+  - rewrite Qmult_assoc, H. apply Qmult_1_l.
+  - rewrite Qmult_assoc, H. apply Qmult_1_l.
+  - rewrite Qmult_assoc, H. apply Qmult_1_l.
+  - rewrite Qmult_assoc, H. apply Qmult_1_l.
+Qed.
+
+(* Cube root specialisation: cube_root_unit u = u^{1/3}. *)
+Definition cube_root_unit (u : UnitQ) : UnitQ := nth_root_unit u 3.
+
+Lemma cube_root_unit_cubed :
+  forall u,
+    UnitQ_eq (unit_pow_q (cube_root_unit u) (Z.pos 3 # 1)) u.
+Proof. intros u. exact (nth_root_unit_pow u 3). Qed.
+
 (* === Axiom audit === *)
 
 Print Assumptions unit_mul_q_inv_r.
 Print Assumptions unit_pow_q_add.
+Print Assumptions unit_pow_q_mul.
+Print Assumptions unit_pow_q_mul_distr.
+Print Assumptions unit_pow_q_neg.
+Print Assumptions nth_root_unit_pow.
+Print Assumptions cube_root_unit_cubed.
 Print Assumptions sqrt_unit_squared.
 Print Assumptions sqrt_T_unit_squared_is_T.
 Print Assumptions inject_Z_zero_unit.

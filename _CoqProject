@@ -23,4 +23,10 @@ theories/pb_avalanche_eddington.v
 theories/pb_avalanche_constructive.v
 theories/pb_avalanche_final.v
 theories/pb_avalanche_romberg.v
+theories/pb_avalanche_spline.v
+theories/pb_avalanche_corner.v
+theories/pb_avalanche_energy_resolved.v
+theories/pb_avalanche_spitzer_numerical.v
+theories/pb_avalanche_coulomb_log.v
+theories/pb_avalanche_maxwellian_sw.v
 theories/pb_avalanche_audit.v

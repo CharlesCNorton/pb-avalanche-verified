@@ -143,6 +143,36 @@ Qed.
    law: the Gamow peak grows with temperature as T^{2/3}, much slower
    than the Maxwellian peak's T scaling. *)
 
+(* === Stationary-point derivation (item 8) === *)
+
+(* The Gamow peak energy raised to the 3/2 power recovers b_G * T / 2,
+   the right-hand side of the stationary-point equation
+   b_G / (2 * E^{3/2}) = 1/T (in the asymptotic regime E ≫ T,
+   where the 1/E term is negligible). *)
+Theorem gamow_peak_cubed_root :
+  forall T, 0 < T -> Rpower (gamow_peak T) (3/2) = b_G * T / 2.
+Proof.
+  intros T HT.
+  unfold gamow_peak.
+  rewrite Rpower_mult.
+  assert (Hxp : 2/3 * (3/2) = 1) by lra.
+  rewrite Hxp. rewrite Rpower_1.
+  - reflexivity.
+  - apply Rdiv_lt_0_compat.
+    + apply Rmult_lt_0_compat; [apply b_G_pos | exact HT].
+    + lra.
+Qed.
+
+(* The stationary-point equation at the Gamow peak (in the
+   dominant-balance approximation): b_G / (2 * E_peak^{3/2}) = 1/T. *)
+Theorem gamow_stationary_equation :
+  forall T, 0 < T -> b_G / (2 * Rpower (gamow_peak T) (3/2)) = 1 / T.
+Proof.
+  intros T HT.
+  rewrite (gamow_peak_cubed_root T HT).
+  field. split; [lra | apply Rgt_not_eq, b_G_pos].
+Qed.
+
 (* The Gamow peak scales as T^{2/3} when b_G is fixed. *)
 Theorem gamow_peak_scaling_T :
   forall T1 T2, 0 < T1 -> T1 <= T2 -> gamow_peak T1 <= gamow_peak T2.

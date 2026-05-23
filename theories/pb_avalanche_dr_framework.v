@@ -185,6 +185,61 @@ Lemma rate_two_density_ratio_dimensionless :
 Proof. apply unit_mul_inv_r. Qed.
 
 (* ================================================================== *)
+(* === Item 19: DR-typed PB_AVALANCHE_PARAMS module type === *)
+(* ================================================================== *)
+
+(* A DR-typed reformulation of the avalanche-framework hypotheses.
+   Every constant carries an explicit physical unit, enforced by
+   the DR type system. Plain-real bounds are re-derived by reading
+   off dr_val. *)
+Module Type DR_PB_AVALANCHE_PARAMS.
+
+  (* Reactor envelope. *)
+  Parameter dr_n_B_max : DR density_unit.
+  Parameter dr_T_max   : DR temp_unit.
+  Parameter dr_n_p_min : DR density_unit.
+
+  Axiom dr_n_B_max_pos : 0 < dr_val dr_n_B_max.
+  Axiom dr_T_max_pos   : 0 < dr_val dr_T_max.
+  Axiom dr_n_p_min_pos : 0 < dr_val dr_n_p_min.
+
+  (* Sup bounds on the knock-on cross section and recoil velocity. *)
+  Parameter dr_sigma_knockon_max : DR sigma_v_unit.
+  Parameter dr_v_alpha_max       : DR sigma_v_unit.
+
+  Axiom dr_sigma_knockon_max_pos : 0 < dr_val dr_sigma_knockon_max.
+  Axiom dr_v_alpha_max_pos       : 0 < dr_val dr_v_alpha_max.
+
+End DR_PB_AVALANCHE_PARAMS.
+
+(* A DR-typed framework module that consumes the above parameters and
+   exposes the upper-bound figure of merit in dimensionally explicit
+   form. *)
+Module DRFramework (DR_P : DR_PB_AVALANCHE_PARAMS).
+  Import DR_P.
+
+  (* The DR-typed FoM upper bound. *)
+  Definition dr_FoM_max :
+    DR (unit_mul density_unit (unit_mul sigma_v_unit sigma_v_unit)) :=
+    dr_mul dr_n_B_max (dr_mul dr_sigma_knockon_max dr_v_alpha_max).
+
+  Lemma dr_FoM_max_value :
+    dr_val dr_FoM_max =
+    dr_val dr_n_B_max *
+    (dr_val dr_sigma_knockon_max * dr_val dr_v_alpha_max).
+  Proof. unfold dr_FoM_max. rewrite !dr_val_mul. reflexivity. Qed.
+
+  Lemma dr_FoM_max_positive : 0 < dr_val dr_FoM_max.
+  Proof.
+    rewrite dr_FoM_max_value.
+    apply Rmult_lt_0_compat; [exact dr_n_B_max_pos |].
+    apply Rmult_lt_0_compat;
+      [exact dr_sigma_knockon_max_pos | exact dr_v_alpha_max_pos].
+  Qed.
+
+End DRFramework.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 

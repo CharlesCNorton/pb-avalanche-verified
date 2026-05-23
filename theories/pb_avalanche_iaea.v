@@ -1452,6 +1452,52 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Symmetric two-sided interpolation bounds (item 11) === *)
+(* ================================================================== *)
+
+(* The two-sided form of the sup bound: every interpolated value lies
+   in the symmetric envelope [-max_abs_v, max_abs_v]. *)
+Theorem interp_linear_two_sided_bound :
+  forall T E, sorted_table T ->
+    head_E T <= E <= last_E T ->
+    - max_abs_v T <= interp_linear T E <= max_abs_v T.
+Proof.
+  intros T E Hsort HE.
+  pose proof (interp_linear_sup_bound T E Hsort HE) as Hsup.
+  split.
+  - apply Rle_trans with (- Rabs (interp_linear T E)).
+    + apply Ropp_le_contravar. exact Hsup.
+    + pose proof (Rabs_pos (interp_linear T E)) as Habs.
+      pose proof (Rabs_left1 (interp_linear T E)) as HleftCase.
+      destruct (Rle_lt_dec 0 (interp_linear T E)) as [Hge | Hlt].
+      * rewrite Rabs_right by lra. lra.
+      * rewrite Rabs_left by exact Hlt. lra.
+  - apply Rle_trans with (Rabs (interp_linear T E)).
+    + pose proof (Rle_abs (interp_linear T E)) as HRle. exact HRle.
+    + exact Hsup.
+Qed.
+
+(* Specialised to the Sikora-Weller table. *)
+Corollary sikora_weller_two_sided_bound :
+  forall E,
+    head_E sikora_weller_pB_table <= E <= last_E sikora_weller_pB_table ->
+    - sikora_weller_M_inf <= interp_linear sikora_weller_pB_table E
+                          <= sikora_weller_M_inf.
+Proof.
+  intros E HE.
+  pose proof (interp_linear_two_sided_bound sikora_weller_pB_table E
+                sikora_weller_pB_table_sorted HE) as [Hlo Hhi].
+  pose proof max_abs_v_SW_value as HMmax.
+  pose proof (max_abs_v_nonneg sikora_weller_pB_table) as Hmpos.
+  split.
+  - apply Rle_trans with (- max_abs_v sikora_weller_pB_table).
+    + apply Ropp_le_contravar. exact HMmax.
+    + exact Hlo.
+  - apply Rle_trans with (max_abs_v sikora_weller_pB_table);
+      [exact Hhi | exact HMmax].
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 

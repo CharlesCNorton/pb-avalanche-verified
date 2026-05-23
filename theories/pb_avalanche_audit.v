@@ -48,6 +48,7 @@ From PBAvalanche Require Import
   pb_avalanche_eddington
   pb_avalanche_constructive
   pb_avalanche_romberg
+  pb_avalanche_spline
   pb_avalanche_final.
 
 (* ================================================================== *)
@@ -360,6 +361,8 @@ Print Assumptions gamow_factor_pos.
 Print Assumptions gamow_factor_decreasing.
 Print Assumptions gamow_peak_pos.
 Print Assumptions gamow_peak_monotone_T.
+Print Assumptions gamow_peak_cubed_root.
+Print Assumptions gamow_stationary_equation.
 
 (* ================================================================== *)
 (* === pb_avalanche_fokker_planck.v — distributional FP === *)
@@ -485,3 +488,6 @@ Print Assumptions pb_avalanche_spitzer_envelope.
 Print Assumptions pb_avalanche_IAEA_error_bound.
 Print Assumptions pb_avalanche_dimensional_balance.
 Print Assumptions pb_avalanche_settlement.
+Print Assumptions hermite_cubic_at_left.
+Print Assumptions hermite_cubic_at_right.
+Print Assumptions hermite_cubic_linear_case.
