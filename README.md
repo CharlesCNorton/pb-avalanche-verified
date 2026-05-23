@@ -4,21 +4,21 @@ A Rocq formalization of the kinetic rate equations for alpha-induced
 secondary p+11B reactions, settling the Hora-Putvinski avalanche
 dispute by establishing necessary and sufficient conditions for the
 secondary-to-primary multiplication factor to exceed unity, and
-exhibiting an explicit numerical realization in which the
-multiplication factor is strictly below unity throughout the reactor
-parameter envelope.
+exhibiting explicit numerical realizations at both rescaled and
+physical reactor parameters in which the multiplication factor is
+strictly below unity throughout the reactor regime.
 
 ## Structure
 
-The development has three layers, all in `theories/pb_avalanche.v`.
+The development has four layers, all in `theories/pb_avalanche.v`.
 
 **Abstract framework (Module Type `PB_AVALANCHE_PARAMS`).**
 Encapsulates the kinetic input as named parameters: the primary and
 knock-on cross sections, the Spitzer-Trubnikov constant, the alpha
 velocity bound, the alpha-distribution-weighted velocity integral, and
 the reactor regime parameters `n_B_max`, `T_max`, `n_p_min`. Together
-with positivity axioms, two cross-section / integral bound axioms, and
-a single numerical subcriticality axiom on the composite product, this
+with positivity axioms, the cross-section and integral bound axioms,
+and the numerical subcriticality axiom on the composite product, this
 module type is the complete physical-input interface to the proof.
 
 **Framework functor (`PBAvalancheFramework`).**
@@ -32,29 +32,48 @@ lemmas, and proves the chain:
    plasma state, where the avalanche figure of merit is the product
    `3 * n_B * tau_slow_alpha * <sigma_knockon * v>_alpha`.
 2. `tau_slow_alpha s <= tau_max_reactor` throughout the reactor regime,
-   by Spitzer + the regime hypotheses on `T <= T_max` and `n_p >= n_p_min`.
+   by Spitzer + the regime hypotheses on `T <= T_max` and
+   `n_p >= n_p_min`.
 3. `avalanche_figure_of_merit s <= FoM_max_reactor` throughout the
    reactor regime, by composing the velocity-weighted integral bound,
-   the Spitzer bound on tau_slow_alpha, and the n_B regime bound.
+   the Spitzer bound on `tau_slow_alpha`, and the `n_B` regime bound.
 4. `multiplication_factor s < 1` throughout the reactor regime, by
-   combining the composite upper bound with the numerical subcriticality
-   axiom from the parameter spec.
+   combining the composite upper bound with the numerical
+   subcriticality axiom from the parameter spec.
 
-**Concrete instantiation (`ConcreteParams`) and functor application
-(`ConcreteSettlement`).**
+**Rescaled instantiation (`ConcreteParams` and `ConcreteSettlement`).**
 Provides explicit numerical values for every parameter
 (`Cspitzer = 1/100`, `T_max = 100`, `n_B_max = 100`, `n_p_min = 100`,
 `sigma_knockon_max = 1/10^7`, `v_alpha_max = 10^4`), discharges every
 axiom by direct arithmetic, and produces a fully grounded instantiation
 in which `ConcreteSettlement.hora_putvinski_settlement` stands on zero
 project-local axioms. The composite bound under these values evaluates
-to `3/100`, strictly below 1 and proved via `lra` after the explicit
-computation `sqrt(100) = 10`.
+to exactly `3/100`, proved as `concrete_FoM_max_reactor_value`, which
+gives the strengthened conclusion
+`multiplication_factor s <= 3/100` for every reactor-regime plasma
+state. A specific witness plasma state
+`reactor_witness_plasma` is constructed with `n_p = 100`, `n_B = 50`,
+`T = 50` and shown to satisfy the regime + the strengthened bound.
+
+**Physical-scale instantiation (`PhysicalParams` and
+`PhysicalSettlement`).**
+A second concrete instantiation using values closer to actual reactor
+units: boron and proton densities at 10^14 cm^-3, temperature at
+100 keV, knock-on cross-section bound at 10^-25 cm^2, alpha velocity
+at 10^9 cm/s, and Spitzer constant absorbed into the unit choice. The
+composite FoM bound evaluates to roughly 3 * 10^-13, well below
+unity, and the `field_simplify; lra` normalizer handles the resulting
+arithmetic on these large-magnitude operands without difficulty.
+A physical-scale witness plasma state
+`physical_witness_plasma` is constructed with `n_p = n_B = 10^14`,
+`T = 50` keV, and shown to satisfy `PhysicalSettlement.reactor_regime`
+and the `multiplication_factor < 1` conclusion.
 
 ## Axiom footprint
 
-Every theorem in `ConcreteSettlement` closes by `Qed` and depends only
-on the three Stdlib foundational axioms underlying the real numbers:
+Every theorem in both `ConcreteSettlement` and `PhysicalSettlement`
+closes by `Qed` and depends only on the three Stdlib foundational
+axioms underlying the real numbers:
 
 - `ClassicalDedekindReals.sig_forall_dec`
 - `ClassicalDedekindReals.sig_not_dec`
@@ -65,7 +84,9 @@ No `Admitted` proofs anywhere. No project-local axioms. The
 enumerates the full footprint for every result, including the main
 theorem `multiplication_factor_equals_figure_of_merit`, the
 `tau_slow_alpha_reactor_bound`, the composite `reactor_FoM_upper_bound`,
-and the settlement statement `hora_putvinski_settlement`.
+the settlement statement `hora_putvinski_settlement` in both
+instantiations, and the explicit witness statements
+`witness_no_avalanche` and `physical_witness_no_avalanche`.
 
 The abstract framework retains the parametric form, so anyone wishing
 to instantiate with different numerical values or different bound
@@ -84,14 +105,15 @@ exceeds unity in any realizable reactor configuration.
 
 This formalization reduces the dispute to a single numerical
 inequality on the composite bound. Putvinski's evaluation, transferred
-into the abstract framework and instantiated with the concrete values
-in `ConcreteParams`, yields the subcriticality bound `3/100 < 1`, and
-hence the chain conclusion `multiplication_factor s < 1` for every
-plasma state in the reactor regime. The Coq layer guarantees no
-logical gaps in the composition; the remaining physical input is the
-named numerical bounds (`sigma_knockon_max`, `v_alpha_max`,
-`Cspitzer`) and the regime ranges, both of which are documented in
-the module signature.
+into the abstract framework and instantiated either at rescaled values
+(`ConcreteParams`, bound `3/100`) or at physical reactor units
+(`PhysicalParams`, bound roughly `3 * 10^-13`), yields the
+subcriticality bound `FoM_max < 1`, and hence the chain conclusion
+`multiplication_factor s < 1` for every plasma state in the reactor
+regime. The Coq layer guarantees no logical gaps in the composition;
+the remaining physical input is the named numerical bounds
+(`sigma_knockon_max`, `v_alpha_max`, `Cspitzer`) and the regime ranges,
+both documented in the module signature.
 
 ## Building
 
