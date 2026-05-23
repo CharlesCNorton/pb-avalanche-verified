@@ -720,6 +720,139 @@ Module KineticFramework (K : KINETIC_MODEL_PARAMS).
   Proof. intros S tau. unfold R_secondary_kinetic. ring. Qed.
 
   (* ================================================================ *)
+  (* === Magnetic field coupling (item 14) === *)
+  (* ================================================================ *)
+
+  (* The alpha Larmor radius rho = m v / (q B) sets the cross-field
+     step size; it decreases as 1/B. Classical cross-field confinement
+     time scales as the number of gyro-orbits to diffuse across the
+     device, tau_confine ~ kappa * B^2. Stronger field means smaller
+     orbits, better confinement, longer residence. *)
+
+  Definition larmor_radius (m v q B : R) : R := m * v / (q * B).
+
+  Lemma larmor_decreasing_in_B :
+    forall m v q B1 B2,
+      0 < m -> 0 < v -> 0 < q -> 0 < B1 -> B1 <= B2 ->
+      larmor_radius m v q B2 <= larmor_radius m v q B1.
+  Proof.
+    intros m v q B1 B2 Hm Hv Hq HB1 HB12.
+    unfold larmor_radius, Rdiv.
+    apply Rmult_le_compat_l; [nra |].
+    apply Rinv_le_contravar.
+    - apply Rmult_lt_0_compat; lra.
+    - nra.
+  Qed.
+
+  Definition tau_confine_of_B (kappa B : R) : R := kappa * B * B.
+
+  Lemma tau_confine_of_B_pos :
+    forall kappa B, 0 < kappa -> 0 < B -> 0 < tau_confine_of_B kappa B.
+  Proof.
+    intros kappa B Hk HB. unfold tau_confine_of_B.
+    apply Rmult_lt_0_compat;
+      [apply Rmult_lt_0_compat; assumption | exact HB].
+  Qed.
+
+  Lemma tau_confine_increasing_in_B :
+    forall kappa B1 B2,
+      0 < kappa -> 0 < B1 -> B1 <= B2 ->
+      tau_confine_of_B kappa B1 <= tau_confine_of_B kappa B2.
+  Proof.
+    intros kappa B1 B2 Hk HB1 HB12. unfold tau_confine_of_B.
+    assert (Hcert : 0 <= kappa * ((B2 - B1) * (B2 + B1))).
+    { apply Rmult_le_pos; [lra |]. apply Rmult_le_pos; lra. }
+    nra.
+  Qed.
+
+  (* tau_eff is increasing in the confinement time. *)
+  Lemma tau_eff_monotone_confine :
+    forall ts tc1 tc2,
+      0 < ts -> 0 < tc1 -> tc1 <= tc2 ->
+      tau_eff ts tc1 <= tau_eff ts tc2.
+  Proof.
+    intros ts tc1 tc2 Hts Htc1 H12.
+    assert (Htc2 : 0 < tc2) by lra.
+    assert (Hd1 : ts + tc1 <> 0) by lra.
+    assert (Hd2 : ts + tc2 <> 0) by lra.
+    unfold tau_eff.
+    apply Rle_trans with
+      (ts * tc1 * (ts + tc2) / ((ts + tc1) * (ts + tc2))).
+    - right. field. split; assumption.
+    - apply Rle_trans with
+        (ts * tc2 * (ts + tc1) / ((ts + tc1) * (ts + tc2))).
+      + unfold Rdiv. apply Rmult_le_compat_r.
+        * apply Rlt_le, Rinv_0_lt_compat, Rmult_lt_0_compat; lra.
+        * assert (Hkey : 0 <= ts * ts * (tc2 - tc1)).
+          { apply Rmult_le_pos.
+            - apply Rmult_le_pos; apply Rlt_le; exact Hts.
+            - lra. }
+          nra.
+      + right. field. split; assumption.
+  Qed.
+
+  (* Effective residence time as a function of the magnetic field. *)
+  Definition tau_eff_B (tau_slow kappa B : R) : R :=
+    tau_eff tau_slow (tau_confine_of_B kappa B).
+
+  Lemma tau_eff_B_le_slow :
+    forall tau_slow kappa B,
+      0 < tau_slow -> 0 < kappa -> 0 < B ->
+      tau_eff_B tau_slow kappa B <= tau_slow.
+  Proof.
+    intros tau_slow kappa B Hts Hk HB.
+    unfold tau_eff_B.
+    apply tau_eff_le_slow; [exact Hts | apply tau_confine_of_B_pos; assumption].
+  Qed.
+
+  (* Stronger field, longer residence: the effective residence time is
+     monotone increasing in B. *)
+  Theorem residence_monotone_in_B :
+    forall tau_slow kappa B1 B2,
+      0 < tau_slow -> 0 < kappa -> 0 < B1 -> B1 <= B2 ->
+      tau_eff_B tau_slow kappa B1 <= tau_eff_B tau_slow kappa B2.
+  Proof.
+    intros tau_slow kappa B1 B2 Hts Hk HB1 HB12.
+    unfold tau_eff_B.
+    apply tau_eff_monotone_confine.
+    - exact Hts.
+    - apply tau_confine_of_B_pos; assumption.
+    - apply tau_confine_increasing_in_B; assumption.
+  Qed.
+
+  (* The multiplication factor is bounded uniformly in B by the
+     slowing-down-limited ceiling: no magnetic field strength raises
+     the secondary rate above the tau_slow bound. The single-channel
+     subcriticality condition therefore suffices for every B. *)
+  Theorem B_field_bounded_multiplication :
+    forall R_prim n_B tau_slow kappa B,
+      0 < R_prim -> 0 < n_B -> 0 < tau_slow -> 0 < kappa -> 0 < B ->
+      kinetic_figure_of_merit R_prim n_B (tau_eff_B tau_slow kappa B) <=
+      3 * tau_slow * n_B * L_kin * (sigma_E_max * v_E_max).
+  Proof.
+    intros R_prim n_B tau_slow kappa B HR HnB Hts Hk HB.
+    unfold tau_eff_B.
+    apply (channels_preserve_bound R_prim n_B tau_slow
+             (tau_confine_of_B kappa B) HR HnB Hts).
+    apply tau_confine_of_B_pos; assumption.
+  Qed.
+
+  Theorem B_field_no_avalanche :
+    forall R_prim n_B tau_slow kappa B,
+      0 < R_prim -> 0 < n_B -> 0 < tau_slow -> 0 < kappa -> 0 < B ->
+      3 * tau_slow * n_B * L_kin * (sigma_E_max * v_E_max) < 1 ->
+      R_secondary_kinetic n_B (3 * R_prim) (tau_eff_B tau_slow kappa B)
+        / R_prim < 1.
+  Proof.
+    intros R_prim n_B tau_slow kappa B HR HnB Hts Hk HB Hsub.
+    unfold tau_eff_B.
+    apply (channels_no_avalanche R_prim n_B tau_slow
+             (tau_confine_of_B kappa B) HR HnB Hts).
+    - apply tau_confine_of_B_pos; assumption.
+    - exact Hsub.
+  Qed.
+
+  (* ================================================================ *)
   (* === Fokker-Planck steady state === *)
   (* ================================================================ *)
 
@@ -908,3 +1041,7 @@ Print Assumptions ConstantKineticFramework.kinetic_no_avalanche.
 Print Assumptions ConstantKineticFramework.kinetic_FoM_sandwich.
 Print Assumptions ConstantKineticFramework.channels_preserve_bound.
 Print Assumptions ConstantKineticFramework.channels_no_avalanche.
+Print Assumptions ConstantKineticFramework.larmor_decreasing_in_B.
+Print Assumptions ConstantKineticFramework.residence_monotone_in_B.
+Print Assumptions ConstantKineticFramework.B_field_bounded_multiplication.
+Print Assumptions ConstantKineticFramework.B_field_no_avalanche.
