@@ -355,3 +355,33 @@ Print Assumptions RInt_fsv_le.
 Print Assumptions IntegralSettlement.hora_putvinski_settlement.
 Print Assumptions IntegralSettlement.reactor_no_multiplication.
 Print Assumptions IntegralParams.alpha_weighted_integral_uniform_bound.
+
+(* ================================================================== *)
+(* === Meta-theorem: all four settlements certify subcriticality === *)
+(* ================================================================== *)
+
+(* Each of the four concrete instantiations (rescaled, physical-scale,
+   saturated-integral, integral-derived) certifies that the avalanche
+   multiplication factor is strictly below unity throughout its reactor
+   regime. The four regimes differ in the numerical values of the
+   physical bounds and in the construction of the velocity integral
+   (asserted vs. computed), but all four converge on the same
+   qualitative conclusion. *)
+
+Theorem all_settlements_subcritical :
+  (forall s, ConcreteSettlement.reactor_regime s ->
+             ConcreteSettlement.multiplication_factor s < 1) /\
+  (forall s, PhysicalSettlement.reactor_regime s ->
+             PhysicalSettlement.multiplication_factor s < 1) /\
+  (forall s, SaturatedSettlement.reactor_regime s ->
+             SaturatedSettlement.multiplication_factor s < 1) /\
+  (forall s, IntegralSettlement.reactor_regime s ->
+             IntegralSettlement.multiplication_factor s < 1).
+Proof.
+  split; [exact ConcreteSettlement.reactor_no_multiplication |].
+  split; [exact PhysicalSettlement.reactor_no_multiplication |].
+  split; [exact SaturatedSettlement.reactor_no_multiplication |].
+  exact IntegralSettlement.reactor_no_multiplication.
+Qed.
+
+Print Assumptions all_settlements_subcritical.
