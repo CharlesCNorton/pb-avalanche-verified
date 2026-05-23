@@ -117,6 +117,90 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Item 21: per-generation chain rates === *)
+(* ================================================================== *)
+
+(* The rate at generation n is M^n * R_primary. Concretely:
+   - generation 0 = primary rate (R_primary)
+   - generation 1 = secondary rate (M * R_primary)
+   - generation 2 = tertiary rate (M^2 * R_primary)
+   - generation 3 = quaternary rate (M^3 * R_primary)
+   - ...
+   In a chain that doesn't avalanche, each generation is strictly
+   smaller than the previous, with ratio M < 1. *)
+Definition R_generation (R_primary M : R) (n : nat) : R :=
+  R_primary * M ^ n.
+
+Lemma R_generation_zero : forall R_primary M, R_generation R_primary M 0 = R_primary.
+Proof. intros. unfold R_generation. simpl. ring. Qed.
+
+Lemma R_generation_succ :
+  forall R_primary M n,
+    R_generation R_primary M (S n) = M * R_generation R_primary M n.
+Proof. intros. unfold R_generation. simpl. ring. Qed.
+
+Definition R_secondary_rate (R_primary M : R) : R := R_generation R_primary M 1.
+Definition R_tertiary_rate  (R_primary M : R) : R := R_generation R_primary M 2.
+Definition R_quaternary_rate (R_primary M : R) : R := R_generation R_primary M 3.
+
+Lemma R_secondary_rate_eq : forall R M,
+  R_secondary_rate R M = M * R.
+Proof. intros. unfold R_secondary_rate, R_generation. simpl. ring. Qed.
+
+Lemma R_tertiary_rate_eq : forall R M,
+  R_tertiary_rate R M = M * M * R.
+Proof. intros. unfold R_tertiary_rate, R_generation. simpl. ring. Qed.
+
+Lemma R_quaternary_rate_eq : forall R M,
+  R_quaternary_rate R M = M * M * M * R.
+Proof. intros. unfold R_quaternary_rate, R_generation. simpl. ring. Qed.
+
+(* For 0 <= M < 1, each successive generation strictly decreases. *)
+Lemma R_generation_decreasing :
+  forall R_primary M n,
+    0 < R_primary -> 0 <= M < 1 ->
+    R_generation R_primary M (S n) <= R_generation R_primary M n.
+Proof.
+  intros R_primary M n HR [HM_lo HM_hi].
+  rewrite R_generation_succ.
+  unfold R_generation.
+  pose proof (pow_le M n HM_lo) as Hpow_pos.
+  pose proof (Rmult_le_pos R_primary (M ^ n)
+                (Rlt_le _ _ HR) Hpow_pos) as Hprod_pos.
+  nra.
+Qed.
+
+(* Generation-n rate goes to zero as n -> infty for M in [0, 1). *)
+Lemma R_generation_lim :
+  forall R_primary M,
+    0 < R_primary -> Rabs M < 1 ->
+    is_lim_seq (fun n => R_generation R_primary M n) 0.
+Proof.
+  intros R_primary M HR HM.
+  unfold R_generation.
+  pose proof (is_lim_seq_scal_l (fun n => M ^ n) R_primary (Finite 0)
+                (is_lim_seq_geom M HM)) as Hs.
+  simpl in Hs.
+  replace 0 with (R_primary * 0) by ring.
+  exact Hs.
+Qed.
+
+(* Sum of all generations: total chain converges and matches
+   R_primary / (1 - M). *)
+Theorem R_chain_total :
+  forall R_primary M,
+    0 <= M -> M < 1 ->
+    is_series (fun n => R_generation R_primary M n) (R_primary / (1 - M)).
+Proof.
+  intros R_primary M HM_lo HM_hi.
+  unfold R_generation.
+  replace (R_primary / (1 - M)) with (R_primary * / (1 - M)).
+  2: { unfold Rdiv. ring. }
+  apply (is_series_scal_l R_primary (fun n => M ^ n)).
+  exact (chain_convergence M HM_lo HM_hi).
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 

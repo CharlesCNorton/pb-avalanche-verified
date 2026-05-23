@@ -29,4 +29,6 @@ theories/pb_avalanche_energy_resolved.v
 theories/pb_avalanche_spitzer_numerical.v
 theories/pb_avalanche_coulomb_log.v
 theories/pb_avalanche_maxwellian_sw.v
+theories/pb_avalanche_synchrotron.v
+theories/pb_avalanche_hora_rebuttal.v
 theories/pb_avalanche_audit.v
