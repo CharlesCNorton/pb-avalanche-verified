@@ -81,11 +81,29 @@ composite bound `3/100 < 1` carries the conclusion through. This
 demonstrates robustness of the conclusion to the specific shape of the
 alpha-distribution-weighted integral.
 
+**Integral-derived instantiation (`IntegralParams` and
+`IntegralSettlement`) in `theories/pb_avalanche_integral.v`.**
+A fourth concrete instantiation in which the alpha-weighted velocity
+integral is defined as a literal Coquelicot Riemann integral rather
+than asserted: the ratio of `RInt (fun _ => sigma_max * v_max)` to
+`RInt (fun _ => 1)` over the birth-energy interval. Both integrals
+evaluate via Coquelicot's `RInt_const`, the ratio reduces to
+`sigma_max * v_max` exactly by `field`, and the abstract bound axiom
+of `PB_AVALANCHE_PARAMS` is discharged by reflexivity on that
+evaluated value. The same file also derives the general
+`alpha_velocity_average_bound` (for arbitrary integrable
+distributions, cross sections, and velocity profiles satisfying the
+uniform bounds) from Coquelicot's `RInt_le` monotonicity, mediated by
+two custom bridge lemmas `ex_RInt_scal_R` and `RInt_scal_R` that
+discharge the typeclass mismatch between Coquelicot's polymorphic
+`scal` over normed modules and Stdlib's `Rmult`.
+
 ## Axiom footprint
 
-Every theorem in `ConcreteSettlement`, `PhysicalSettlement`, and
-`SaturatedSettlement` closes by `Qed` and depends only on the three
-Stdlib foundational axioms underlying the real numbers:
+Every theorem in `ConcreteSettlement`, `PhysicalSettlement`,
+`SaturatedSettlement`, and `IntegralSettlement` closes by `Qed` and
+depends only on the three Stdlib foundational axioms underlying the
+real numbers:
 
 - `ClassicalDedekindReals.sig_forall_dec`
 - `ClassicalDedekindReals.sig_not_dec`
@@ -121,10 +139,16 @@ from this formalization. The three closed-form physical identities
 (Spitzer-Trubnikov slowing-down time, slowing-down Fokker-Planck
 equilibrium, bilinear kinetic decomposition of the secondary rate)
 are encoded as Coq `Definition`s and so hold definitionally inside
-the framework functor; they are not derived from a first-principles
-integration of the kinetic equations in Coq, since that would require
-an integration framework (Coquelicot or MathComp Analysis Lebesgue)
-not used here.
+the framework functor. The velocity-weighted integral bound is the
+one closed-form identity that the `IntegralSettlement` derives from
+first principles in Coq via Coquelicot's Riemann integral
+monotonicity; the abstract `alpha_weighted_integral_uniform_bound`
+axiom of `PB_AVALANCHE_PARAMS` is discharged by reflexivity on the
+literal value of the integral ratio under the chosen constant
+cross-section and velocity. Extending this same treatment to
+non-constant cross sections or non-uniform alpha distributions is
+mechanical given Coquelicot's API and the bridge lemmas
+`ex_RInt_scal_R` / `RInt_scal_R` already provided.
 
 ## What this settles
 
@@ -159,7 +183,8 @@ Generates `Makefile.coq` via `rocq makefile` and compiles
 
 ## Dependencies
 
-- Rocq 9.0 (Stdlib `Reals` and `Lra` only).
+- Rocq 9.0 with Stdlib `Reals` and `Lra` (main file).
+- Coquelicot 3.4 (integral derivation file).
 
 ## References
 
