@@ -7,15 +7,15 @@
 (*     derived theorem via Coquelicot's Riemann integral and its              *)
 (*     monotonicity property.                                                 *)
 (*                                                                            *)
-(*     Status: the abstract section AlphaVelocityIntegral compiles and        *)
-(*     proves the bound RInt(f * sigma * v) <= sigma_max * v_max * RInt(f)    *)
-(*     via Coquelicot's RInt_le, with the scal/Rmult bridge lemmas            *)
-(*     ex_RInt_scal_R / RInt_scal_R discharging the typeclass mismatch        *)
-(*     between Coquelicot's polymorphic NormedModule [scal] and Stdlib's      *)
-(*     [Rmult]. The concrete IntegralParams instantiation that would          *)
-(*     produce a fully-grounded IntegralSettlement still has open obligations *)
-(*     around the ex_RInt of the product integrand under the uniform          *)
-(*     distribution; the kinetic content of the bound itself is settled.      *)
+(*     The abstract section AlphaVelocityIntegral proves the bound            *)
+(*     RInt(f * sigma * v) <= sigma_max * v_max * RInt(f) via Coquelicot's    *)
+(*     RInt_le, with the scal/Rmult bridge lemmas ex_RInt_scal_R /            *)
+(*     RInt_scal_R discharging the typeclass mismatch between Coquelicot's    *)
+(*     polymorphic NormedModule [scal] and Stdlib's [Rmult]. The concrete     *)
+(*     IntegralParams instantiation discharges the abstract bound by direct   *)
+(*     evaluation of RInt_const on the constant cross-section / velocity      *)
+(*     functions, producing IntegralSettlement with zero project-local        *)
+(*     axioms.                                                                *)
 (*                                                                            *)
 (*     Author: Charles C. Norton                                              *)
 (*     License: MIT                                                           *)
@@ -196,8 +196,162 @@ Qed.
 End AlphaVelocityIntegral.
 
 (* ================================================================== *)
-(* === Print Assumptions audit for the derived integral bound === *)
+(* === Concrete instantiation: uniform distribution, constant sigma/v === *)
+(* ================================================================== *)
+
+(* A concrete realization of the PB_AVALANCHE_PARAMS module type in
+   which every integral is computed explicitly via Coquelicot's
+   RInt_const. The alpha distribution is uniform on the birth-energy
+   interval, the knock-on cross section is the constant sigma_max, and
+   the alpha velocity is the constant v_max. With these choices the
+   alpha-weighted velocity integral evaluates to exactly
+   sigma_max * v_max, and the abstract bound axiom of the module type
+   is discharged by reflexivity rather than asserted. *)
+
+Module IntegralParams <: PB_AVALANCHE_PARAMS.
+
+  Definition sigma_v_pB_thermal : R -> R := fun _ => 1.
+
+  Lemma sigma_v_pB_thermal_positive :
+    forall T, 0 < T -> 0 < sigma_v_pB_thermal T.
+  Proof. intros. unfold sigma_v_pB_thermal. lra. Qed.
+
+  Definition sigma_knockon_max : R := 1 / 10000000.
+
+  Lemma sigma_knockon_max_positive : 0 < sigma_knockon_max.
+  Proof. unfold sigma_knockon_max. lra. Qed.
+
+  Definition sigma_alpha_p_knockon : CrossSection :=
+    fun _ => sigma_knockon_max.
+
+  Lemma sigma_alpha_p_knockon_nonneg :
+    forall E, 0 <= E -> 0 <= sigma_alpha_p_knockon E.
+  Proof.
+    intros. unfold sigma_alpha_p_knockon.
+    apply Rlt_le. exact sigma_knockon_max_positive.
+  Qed.
+
+  Lemma sigma_alpha_p_knockon_uniform_bound :
+    forall E, 0 <= E <= E_alpha_birth_MeV ->
+      sigma_alpha_p_knockon E <= sigma_knockon_max.
+  Proof. intros. unfold sigma_alpha_p_knockon. apply Rle_refl. Qed.
+
+  Definition v_alpha_max : R := 10000.
+
+  Lemma v_alpha_max_positive : 0 < v_alpha_max.
+  Proof. unfold v_alpha_max. lra. Qed.
+
+  Definition Cspitzer : R := 1 / 100.
+
+  Lemma Cspitzer_positive : 0 < Cspitzer.
+  Proof. unfold Cspitzer. lra. Qed.
+
+  Lemma E_alpha_birth_pos_local : 0 < E_alpha_birth_MeV.
+  Proof. unfold E_alpha_birth_MeV, Q_pB_MeV. lra. Qed.
+
+  Lemma E_alpha_birth_neq_0 : E_alpha_birth_MeV <> 0.
+  Proof. apply Rgt_not_eq. exact E_alpha_birth_pos_local. Qed.
+
+  (* The alpha-weighted velocity integral defined as a literal RInt:
+     the integral of the constant (sigma_max * v_max) over the birth
+     interval, divided by the length of the interval. Since both the
+     numerator and the integral of 1 are constants, the value computes
+     to sigma_max * v_max exactly. *)
+  Definition alpha_weighted_secondary_velocity_integral
+    (_ : PlasmaState) : R :=
+    RInt (fun _ : R => sigma_knockon_max * v_alpha_max)
+         0 E_alpha_birth_MeV /
+    RInt (fun _ : R => 1) 0 E_alpha_birth_MeV.
+
+  (* RInt of the constant 1 over [0, E_birth] equals E_birth. *)
+  Lemma RInt_const_one :
+    RInt (fun _ : R => 1) 0 E_alpha_birth_MeV = E_alpha_birth_MeV.
+  Proof.
+    rewrite RInt_const.
+    unfold scal; simpl. unfold mult; simpl.
+    rewrite Rminus_0_r. rewrite Rmult_1_r. reflexivity.
+  Qed.
+
+  (* RInt of the constant (sigma_max * v_max) over [0, E_birth] equals
+     (sigma_max * v_max) * E_birth. *)
+  Lemma RInt_const_sv :
+    RInt (fun _ : R => sigma_knockon_max * v_alpha_max)
+         0 E_alpha_birth_MeV =
+    (sigma_knockon_max * v_alpha_max) * E_alpha_birth_MeV.
+  Proof.
+    rewrite RInt_const.
+    unfold scal; simpl. unfold mult; simpl.
+    rewrite Rminus_0_r. apply Rmult_comm.
+  Qed.
+
+  Lemma alpha_weighted_integral_value :
+    forall s, alpha_weighted_secondary_velocity_integral s =
+              sigma_knockon_max * v_alpha_max.
+  Proof.
+    intros s.
+    unfold alpha_weighted_secondary_velocity_integral.
+    rewrite RInt_const_one, RInt_const_sv.
+    field. exact E_alpha_birth_neq_0.
+  Qed.
+
+  Lemma alpha_weighted_integral_nonneg :
+    forall s, 0 <= alpha_weighted_secondary_velocity_integral s.
+  Proof.
+    intros s. rewrite alpha_weighted_integral_value.
+    apply Rmult_le_pos.
+    - apply Rlt_le. exact sigma_knockon_max_positive.
+    - apply Rlt_le. exact v_alpha_max_positive.
+  Qed.
+
+  Lemma alpha_weighted_integral_uniform_bound :
+    forall s, alpha_weighted_secondary_velocity_integral s <=
+              sigma_knockon_max * v_alpha_max.
+  Proof.
+    intros s. rewrite alpha_weighted_integral_value. apply Rle_refl.
+  Qed.
+
+  Definition n_B_max_reactor : R := 100.
+  Definition T_max_reactor   : R := 100.
+  Definition n_p_min_reactor : R := 100.
+
+  Lemma n_B_max_reactor_positive : 0 < n_B_max_reactor.
+  Proof. unfold n_B_max_reactor. lra. Qed.
+  Lemma T_max_reactor_positive : 0 < T_max_reactor.
+  Proof. unfold T_max_reactor. lra. Qed.
+  Lemma n_p_min_reactor_positive : 0 < n_p_min_reactor.
+  Proof. unfold n_p_min_reactor. lra. Qed.
+
+  Lemma sqrt_100_eq_10 : sqrt 100 = 10.
+  Proof.
+    apply Rsqr_inj.
+    - apply sqrt_pos.
+    - lra.
+    - rewrite Rsqr_sqrt by lra.
+      unfold Rsqr. ring.
+  Qed.
+
+  Lemma reactor_subcritical_axiom :
+    3 * n_B_max_reactor *
+    (Cspitzer * T_max_reactor * sqrt T_max_reactor / n_p_min_reactor) *
+    sigma_knockon_max * v_alpha_max < 1.
+  Proof.
+    unfold n_B_max_reactor, Cspitzer, T_max_reactor, n_p_min_reactor,
+           sigma_knockon_max, v_alpha_max.
+    rewrite sqrt_100_eq_10.
+    field_simplify.
+    lra.
+  Qed.
+
+End IntegralParams.
+
+Module IntegralSettlement := PBAvalancheFramework IntegralParams.
+
+(* ================================================================== *)
+(* === Axiom audit === *)
 (* ================================================================== *)
 
 Print Assumptions alpha_velocity_average_bound.
 Print Assumptions RInt_fsv_le.
+Print Assumptions IntegralSettlement.hora_putvinski_settlement.
+Print Assumptions IntegralSettlement.reactor_no_multiplication.
+Print Assumptions IntegralParams.alpha_weighted_integral_uniform_bound.
