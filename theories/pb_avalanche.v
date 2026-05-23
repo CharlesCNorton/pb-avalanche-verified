@@ -917,6 +917,9 @@ Print Assumptions ConcreteSettlement.tau_slow_alpha_reactor_bound.
 Print Assumptions ConcreteSettlement.reactor_FoM_upper_bound.
 Print Assumptions ConcreteSettlement.reactor_no_avalanche.
 Print Assumptions ConcreteSettlement.reactor_no_multiplication.
+Print Assumptions ConcreteSettlement.multiplication_factor_pointwise_bound.
+Print Assumptions ConcreteSettlement.reactor_safety_margin_positive.
+Print Assumptions ConcreteSettlement.reactor_safety_margin_bound.
 
 (* The concrete settlement: zero project-local axioms. The remaining
    assumptions are the Stdlib foundational axioms underlying R itself
