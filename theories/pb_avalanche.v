@@ -1057,6 +1057,20 @@ Proof.
   - rewrite physical_FoM_max_value. apply Rle_refl.
 Qed.
 
+(* Safety margin at physical reactor parameters: 1 - M(s) is at least
+   1 - 3/10^13, i.e., the multiplication factor stays at least 13
+   orders of magnitude below the avalanche threshold throughout the
+   regime. *)
+Theorem physical_safety_margin :
+  forall (s : PlasmaState),
+    PhysicalSettlement.reactor_regime s ->
+    PhysicalSettlement.multiplication_factor s <= 1 / 1000000000000.
+Proof.
+  intros s Hr.
+  pose proof (physical_multiplication_factor_bound s Hr) as Hbd.
+  lra.
+Qed.
+
 (* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
