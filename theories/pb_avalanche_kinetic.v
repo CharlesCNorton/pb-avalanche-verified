@@ -376,6 +376,96 @@ Module KineticFramework (K : KINETIC_MODEL_PARAMS).
       + apply (sigma_v_kinetic_bound S tau HS Htau).
   Qed.
 
+  (* ================================================================ *)
+  (* === Fokker-Planck steady state === *)
+  (* ================================================================ *)
+
+  (* Continuous slowing-down model. The alpha energy-loss rate (Coulomb
+     drag) is Edot(E) = - E / tau: alphas lose energy at a rate
+     proportional to their energy, with time constant tau. The
+     slowing-down flux is Phi(E) = Edot(E) * f(E), the number of alphas
+     per unit time crossing energy E on their way down. *)
+
+  Definition Edot (tau : R) (E : R) : R := - E / tau.
+
+  Definition slowing_flux (S tau : R) (E : R) : R :=
+    Edot tau E * f_slowing S tau E.
+
+  (* The slowing-down flux is constant in energy, equal to -S:
+     this is the closed form Phi(E) = (-E/tau)(S tau / E) = -S. *)
+  Lemma slowing_flux_constant :
+    forall S tau E, 0 < tau -> E <> 0 ->
+      slowing_flux S tau E = - S.
+  Proof.
+    intros S tau E Htau HE.
+    unfold slowing_flux, Edot, f_slowing.
+    field. split; [exact HE | apply Rgt_not_eq; exact Htau].
+  Qed.
+
+  (* Steady state (integrated form): the divergence d/dE[Edot f]
+     vanishes, so the flux takes the same value at every energy. This
+     is the steady-state slowing-down Fokker-Planck equation away from
+     the source: no alpha accumulation at any intermediate energy. *)
+  Theorem slowing_down_steady_state :
+    forall S tau E1 E2, 0 < tau -> E1 <> 0 -> E2 <> 0 ->
+      slowing_flux S tau E1 = slowing_flux S tau E2.
+  Proof.
+    intros S tau E1 E2 Htau HE1 HE2.
+    rewrite (slowing_flux_constant S tau E1 Htau HE1).
+    rewrite (slowing_flux_constant S tau E2 Htau HE2).
+    reflexivity.
+  Qed.
+
+  (* Source equals sink: the flux entering at the birth energy (the S
+     alphas per unit time born from p+11B fusion) equals the flux
+     leaving at the thermal cutoff (the S alphas per unit time
+     thermalizing). Particle conservation in steady state. *)
+  Theorem source_equals_sink :
+    forall S tau, 0 < tau ->
+      slowing_flux S tau E_alpha_birth_MeV = slowing_flux S tau E_min.
+  Proof.
+    intros S tau Htau.
+    apply slowing_down_steady_state.
+    - exact Htau.
+    - apply Rgt_not_eq. exact E_alpha_birth_kinetic_pos.
+    - apply Rgt_not_eq. exact E_min_pos.
+  Qed.
+
+  (* The source magnitude: the birth rate carried by the flux at the
+     birth energy is exactly S. *)
+  Theorem flux_carries_source :
+    forall S tau, 0 < tau ->
+      slowing_flux S tau E_alpha_birth_MeV = - S.
+  Proof.
+    intros S tau Htau.
+    apply slowing_flux_constant.
+    - exact Htau.
+    - apply Rgt_not_eq. exact E_alpha_birth_kinetic_pos.
+  Qed.
+
+  (* Differential form of the steady-state equation: the derivative of
+     the slowing-down flux is zero at every reactive energy. This is
+     the pointwise statement d/dE[Edot(E) f(E)] = 0, the slowing-down
+     Fokker-Planck equation in the source-free region E_min <= E. The
+     flux is locally constant near any such E (which is bounded away
+     from the singular point 0), so its derivative vanishes. *)
+  Theorem slowing_flux_steady_derivative :
+    forall S tau E, 0 < tau -> E_min <= E ->
+      is_derive (slowing_flux S tau) E 0.
+  Proof.
+    intros S tau E Htau HE.
+    pose proof E_min_pos as HEmin.
+    apply (is_derive_ext_loc (fun _ : R => - S)).
+    - (* slowing_flux = -S in a neighborhood of E (where E > 0) *)
+      apply (locally_interval _ E 0 (E + 1)).
+      + simpl. lra.
+      + simpl. lra.
+      + intros y Hy0 Hy1. simpl in Hy0. symmetry.
+        apply slowing_flux_constant; [exact Htau |].
+        apply Rgt_not_eq. exact Hy0.
+    - apply (is_derive_const (- S) E).
+  Qed.
+
 End KineticFramework.
 
 (* ================================================================== *)
@@ -448,3 +538,6 @@ Print Assumptions ConstantKineticFramework.R_secondary_kinetic_factorization.
 Print Assumptions ConstantKineticFramework.multiplication_factor_kinetic_bound.
 Print Assumptions ConstantKineticFramework.RInt_inv_E.
 Print Assumptions ConstantKineticFramework.RInt_f_slowing.
+Print Assumptions ConstantKineticFramework.slowing_down_steady_state.
+Print Assumptions ConstantKineticFramework.source_equals_sink.
+Print Assumptions ConstantKineticFramework.slowing_flux_steady_derivative.
