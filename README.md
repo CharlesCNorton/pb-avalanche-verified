@@ -69,11 +69,23 @@ A physical-scale witness plasma state
 `T = 50` keV, and shown to satisfy `PhysicalSettlement.reactor_regime`
 and the `multiplication_factor < 1` conclusion.
 
+**Saturated-integral instantiation (`SaturatedParams` and
+`SaturatedSettlement`).**
+A third concrete instantiation where the alpha-weighted velocity
+integral attains its upper bound pointwise (rather than being trivially
+zero, as in `ConcreteParams`). The cross-section is set to the uniform
+bound `sigma_knockon_max` everywhere, and the integral itself to
+`sigma_knockon_max * v_alpha_max`. The reactor-regime conclusion still
+holds: even at the worst-case shape of the alpha spectrum, the
+composite bound `3/100 < 1` carries the conclusion through. This
+demonstrates robustness of the conclusion to the specific shape of the
+alpha-distribution-weighted integral.
+
 ## Axiom footprint
 
-Every theorem in both `ConcreteSettlement` and `PhysicalSettlement`
-closes by `Qed` and depends only on the three Stdlib foundational
-axioms underlying the real numbers:
+Every theorem in `ConcreteSettlement`, `PhysicalSettlement`, and
+`SaturatedSettlement` closes by `Qed` and depends only on the three
+Stdlib foundational axioms underlying the real numbers:
 
 - `ClassicalDedekindReals.sig_forall_dec`
 - `ClassicalDedekindReals.sig_not_dec`
@@ -92,6 +104,27 @@ The abstract framework retains the parametric form, so anyone wishing
 to instantiate with different numerical values or different bound
 assumptions can do so by providing an alternative module satisfying
 `PB_AVALANCHE_PARAMS`.
+
+## Scope
+
+The formalization covers the magnetic-confinement regime where the
+boron density is bounded by `n_B_max_reactor` (set to 10^14 cm^-3 in
+`PhysicalParams`). It does not directly address laser-driven
+fast-ignition configurations, which use solid-density boron at
+roughly 10^22 cm^-3 and would violate the regime hypotheses of every
+instantiation provided here. A laser-driven instantiation would
+require either a different choice of `n_B_max_reactor` (in which case
+the `reactor_subcritical_axiom` would have to be re-verified
+numerically at the new values, and may fail) or a wholly different
+parameter spec that incorporates energy-balance constraints absent
+from this formalization. The three closed-form physical identities
+(Spitzer-Trubnikov slowing-down time, slowing-down Fokker-Planck
+equilibrium, bilinear kinetic decomposition of the secondary rate)
+are encoded as Coq `Definition`s and so hold definitionally inside
+the framework functor; they are not derived from a first-principles
+integration of the kinetic equations in Coq, since that would require
+an integration framework (Coquelicot or MathComp Analysis Lebesgue)
+not used here.
 
 ## What this settles
 

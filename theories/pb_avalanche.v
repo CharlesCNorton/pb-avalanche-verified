@@ -778,6 +778,111 @@ End PhysicalParams.
 Module PhysicalSettlement := PBAvalancheFramework PhysicalParams.
 
 (* ================================================================== *)
+(* === Saturated-integral instantiation === *)
+(* ================================================================== *)
+
+(* A third concrete instantiation where the alpha-weighted velocity
+   integral attains its upper bound sigma_knockon_max * v_alpha_max
+   pointwise on every plasma state, rather than being trivially zero.
+   This demonstrates that the subcriticality conclusion holds even at
+   the worst-case integral value: the bound is robust to the alpha
+   spectrum's actual shape, as long as the uniform sigma/velocity
+   bounds are respected. Uses the same numerical scaling as
+   ConcreteParams; the resulting FoM_max bound is still 3/100. *)
+
+Module SaturatedParams <: PB_AVALANCHE_PARAMS.
+
+  Definition sigma_v_pB_thermal : R -> R := fun _ => 1.
+
+  Lemma sigma_v_pB_thermal_positive :
+    forall T, 0 < T -> 0 < sigma_v_pB_thermal T.
+  Proof. intros. unfold sigma_v_pB_thermal. lra. Qed.
+
+  Definition sigma_knockon_max : R := 1 / 10000000.
+
+  Lemma sigma_knockon_max_positive : 0 < sigma_knockon_max.
+  Proof. unfold sigma_knockon_max. lra. Qed.
+
+  Definition sigma_alpha_p_knockon : CrossSection := fun _ => sigma_knockon_max.
+
+  Lemma sigma_alpha_p_knockon_nonneg :
+    forall E, 0 <= E -> 0 <= sigma_alpha_p_knockon E.
+  Proof.
+    intros. unfold sigma_alpha_p_knockon.
+    apply Rlt_le. exact sigma_knockon_max_positive.
+  Qed.
+
+  Lemma sigma_alpha_p_knockon_uniform_bound :
+    forall E, 0 <= E <= E_alpha_birth_MeV ->
+      sigma_alpha_p_knockon E <= sigma_knockon_max.
+  Proof. intros. unfold sigma_alpha_p_knockon. apply Rle_refl. Qed.
+
+  Definition v_alpha_max : R := 10000.
+
+  Lemma v_alpha_max_positive : 0 < v_alpha_max.
+  Proof. unfold v_alpha_max. lra. Qed.
+
+  Definition Cspitzer : R := 1 / 100.
+
+  Lemma Cspitzer_positive : 0 < Cspitzer.
+  Proof. unfold Cspitzer. lra. Qed.
+
+  Definition alpha_weighted_secondary_velocity_integral
+    (_ : PlasmaState) : R := sigma_knockon_max * v_alpha_max.
+
+  Lemma alpha_weighted_integral_nonneg :
+    forall s, 0 <= alpha_weighted_secondary_velocity_integral s.
+  Proof.
+    intros. unfold alpha_weighted_secondary_velocity_integral,
+                   sigma_knockon_max, v_alpha_max.
+    lra.
+  Qed.
+
+  Lemma alpha_weighted_integral_uniform_bound :
+    forall s, alpha_weighted_secondary_velocity_integral s <=
+              sigma_knockon_max * v_alpha_max.
+  Proof.
+    intros. unfold alpha_weighted_secondary_velocity_integral.
+    apply Rle_refl.
+  Qed.
+
+  Definition n_B_max_reactor : R := 100.
+  Definition T_max_reactor   : R := 100.
+  Definition n_p_min_reactor : R := 100.
+
+  Lemma n_B_max_reactor_positive : 0 < n_B_max_reactor.
+  Proof. unfold n_B_max_reactor. lra. Qed.
+  Lemma T_max_reactor_positive : 0 < T_max_reactor.
+  Proof. unfold T_max_reactor. lra. Qed.
+  Lemma n_p_min_reactor_positive : 0 < n_p_min_reactor.
+  Proof. unfold n_p_min_reactor. lra. Qed.
+
+  Lemma sqrt_100_eq_10 : sqrt 100 = 10.
+  Proof.
+    apply Rsqr_inj.
+    - apply sqrt_pos.
+    - lra.
+    - rewrite Rsqr_sqrt by lra.
+      unfold Rsqr. ring.
+  Qed.
+
+  Lemma reactor_subcritical_axiom :
+    3 * n_B_max_reactor *
+    (Cspitzer * T_max_reactor * sqrt T_max_reactor / n_p_min_reactor) *
+    sigma_knockon_max * v_alpha_max < 1.
+  Proof.
+    unfold n_B_max_reactor, Cspitzer, T_max_reactor, n_p_min_reactor,
+           sigma_knockon_max, v_alpha_max.
+    rewrite sqrt_100_eq_10.
+    field_simplify.
+    lra.
+  Qed.
+
+End SaturatedParams.
+
+Module SaturatedSettlement := PBAvalancheFramework SaturatedParams.
+
+(* ================================================================== *)
 (* === Quantitative bound in the concrete settlement === *)
 (* ================================================================== *)
 
@@ -937,3 +1042,9 @@ Print Assumptions witness_multiplication_factor_bound.
 Print Assumptions PhysicalSettlement.hora_putvinski_settlement.
 Print Assumptions PhysicalSettlement.reactor_no_multiplication.
 Print Assumptions physical_witness_no_avalanche.
+
+(* The saturated-integral settlement: also zero project-local axioms.
+   Confirms the conclusion holds even when the alpha-weighted velocity
+   integral saturates its upper bound pointwise. *)
+Print Assumptions SaturatedSettlement.hora_putvinski_settlement.
+Print Assumptions SaturatedSettlement.reactor_no_multiplication.
