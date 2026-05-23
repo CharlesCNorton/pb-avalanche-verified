@@ -314,6 +314,47 @@ Module KineticFramework (K : KINETIC_MODEL_PARAMS).
 
   (* --- Main derived theorem: sigma_v_kinetic <= sigma_max * v_max --- *)
 
+  (* Constant-case closed form: when sigma_E and v_E are pointwise equal
+     to constants sigma0 and v0 on the reactive window, the velocity-
+     weighted average reduces to sigma0 * v0 — the inequality of
+     sigma_v_kinetic_bound becomes an equality. The argument is by
+     extending the integral integrand pointwise via RInt_ext, then
+     factoring the constant sigma0 * v0 out of the f-weighted integral. *)
+  Theorem sigma_v_kinetic_constant_value :
+    forall (sigma0 v0 : R) (S tau : R),
+      0 < S -> 0 < tau ->
+      (forall E, E_min <= E <= E_alpha_birth_MeV -> sigma_E E = sigma0) ->
+      (forall E, E_min <= E <= E_alpha_birth_MeV -> v_E E = v0) ->
+      sigma_v_kinetic S tau = sigma0 * v0.
+  Proof.
+    intros sigma0 v0 S tau HS Htau Hsig Hv.
+    unfold sigma_v_kinetic.
+    pose proof (n_alpha_kinetic_pos S tau HS Htau) as Hn_pos.
+    assert (Hex_f : ex_RInt (f_slowing S tau) E_min E_alpha_birth_MeV)
+      by apply ex_RInt_f_slowing.
+    (* Step 1: rewrite the integrand pointwise on [E_min, E_birth]. *)
+    pose proof E_min_le_birth as HleE.
+    assert (Hint_eq :
+      RInt (fun E => f_slowing S tau E * (sigma_E E * v_E E))
+           E_min E_alpha_birth_MeV =
+      RInt (fun E => (sigma0 * v0) * f_slowing S tau E)
+           E_min E_alpha_birth_MeV).
+    { apply (@RInt_ext R_CompleteNormedModule).
+      intros x Hx.
+      rewrite Rmin_left in Hx by exact HleE.
+      rewrite Rmax_right in Hx by exact HleE.
+      assert (HxE : E_min <= x <= E_alpha_birth_MeV) by lra.
+      change ((fun E0 : R => f_slowing S tau E0 * (sigma_E E0 * v_E E0)) x =
+              (fun E0 : R => sigma0 * v0 * f_slowing S tau E0) x).
+      cbv beta.
+      rewrite (Hsig x HxE), (Hv x HxE). ring. }
+    rewrite Hint_eq.
+    (* Step 2: factor sigma0 * v0 out of the integral. *)
+    rewrite RInt_scal_R by exact Hex_f.
+    unfold n_alpha_kinetic.
+    field. apply Rgt_not_eq. exact Hn_pos.
+  Qed.
+
   Theorem sigma_v_kinetic_bound :
     forall S tau, 0 < S -> 0 < tau ->
       sigma_v_kinetic S tau <= sigma_E_max * v_E_max.
@@ -499,6 +540,43 @@ Module KineticFramework (K : KINETIC_MODEL_PARAMS).
     rewrite (R_secondary_kinetic_factorization n_B (3 * R_prim) tau HS Htau).
     rewrite n_alpha_kinetic_value.
     unfold L_kin. ring.
+  Qed.
+
+  (* Explicit identification of the alpha density from the source and
+     residence time: the integral of the 1/E slowing-down spectrum over
+     the reactive window evaluates to (source rate) * (residence time) *
+     (kinematic factor ln(E_birth/E_min)). This is the bridge that
+     connects the two factorizations
+       R_secondary = n_alpha * n_B * sigma_v_kinetic   (R_secondary_kinetic_factorization)
+       R_secondary = 3 * R_prim * tau * n_B * (L * sigma_v_kinetic)
+                                                       (R_secondary_bilinear_factorization)
+     under the source convention S = 3 * R_prim (three alphas per primary
+     reaction). It is implicit in the current proof of
+     R_secondary_bilinear_factorization (via rewrite n_alpha_kinetic_value)
+     but here it is named as a standalone lemma so the kinematic-factor
+     identity is auditable on its own. *)
+  Theorem n_alpha_from_source_and_residence :
+    forall R_prim tau, 0 < R_prim -> 0 < tau ->
+      n_alpha_kinetic (3 * R_prim) tau = 3 * R_prim * tau * L_kin.
+  Proof.
+    intros R_prim tau HR Htau.
+    rewrite n_alpha_kinetic_value.
+    unfold L_kin. ring.
+  Qed.
+
+  (* Bridge in the opposite direction: given the standalone n_alpha
+     identity, the bilinear factorization recovers from
+     R_secondary_kinetic_factorization by substitution. *)
+  Theorem R_secondary_bilinear_via_n_alpha :
+    forall R_prim n_B tau,
+      0 < R_prim -> 0 < tau ->
+      R_secondary_kinetic n_B (3 * R_prim) tau =
+      n_alpha_kinetic (3 * R_prim) tau * n_B *
+        sigma_v_kinetic (3 * R_prim) tau.
+  Proof.
+    intros R_prim n_B tau HR Htau.
+    assert (HS : 0 < 3 * R_prim) by lra.
+    apply R_secondary_kinetic_factorization; assumption.
   Qed.
 
   (* The energy-resolved figure of merit. *)

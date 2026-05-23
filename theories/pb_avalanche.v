@@ -523,6 +523,33 @@ Module PBAvalancheFramework (P : PB_AVALANCHE_PARAMS).
     lra.
   Qed.
 
+  (* Sharp dichotomy: the avalanche threshold M = 1 is strictly excluded
+     by the reactor regime, not merely bounded above by it. Equivalently:
+     for every plasma state in the regime, the multiplication factor is
+     not equal to unity. The proof is immediate from
+     reactor_no_multiplication (which gives M < 1, hence M <> 1), but it
+     is stated as a standalone theorem because the dichotomy is the
+     content of the no-avalanche conclusion when read as a strict
+     separation rather than a one-sided estimate. *)
+  Theorem reactor_no_marginal :
+    forall (s : PlasmaState),
+      reactor_regime s -> multiplication_factor s <> 1.
+  Proof.
+    intros s Hr Heq.
+    pose proof (reactor_no_multiplication s Hr) as HM.
+    lra.
+  Qed.
+
+  (* The same dichotomy at the figure-of-merit level. *)
+  Theorem reactor_FoM_no_marginal :
+    forall (s : PlasmaState),
+      reactor_regime s -> avalanche_figure_of_merit s <> 1.
+  Proof.
+    intros s Hr Heq.
+    pose proof (reactor_no_avalanche s Hr) as HFoM.
+    lra.
+  Qed.
+
   Theorem reactor_FoM_avalanche_impossible :
     forall (s : PlasmaState),
       1 <= avalanche_figure_of_merit s -> ~ reactor_regime s.

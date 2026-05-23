@@ -34,16 +34,71 @@ Open Scope R_scope.
 (* ================================================================== *)
 
 (* Antiderivative of the Boltzmann weight: d/dE [ -T exp(-E/T) ] =
-   exp(-E/T). *)
+   exp(-E/T). Derived explicitly by composing the product rule on
+   the outer (-T) * exp(-x/T) with the chain rule on the inner
+   exp(-x/T), the constant rule on -T, and the linear rule on -x/T. *)
+
+Lemma neg_id_over_T_rewrite :
+  forall T x, T <> 0 -> x * (- / T) = - x / T.
+Proof. intros T x HT. field. exact HT. Qed.
+
+Lemma is_derive_id_times_const :
+  forall (c : R) (E : R),
+    is_derive (fun x : R => x * c) E c.
+Proof.
+  intros c E.
+  pose proof
+    (@Derive.is_derive_mult (fun x : R => x) (fun _ : R => c) E 1 0
+       (@is_derive_id R_AbsRing E) (is_derive_const c E))
+    as H.
+  cbv beta in H.
+  assert (Heq : 1 * c + E * 0 = c) by ring.
+  rewrite Heq in H.
+  exact H.
+Qed.
+
+Lemma is_derive_neg_id_over_T :
+  forall T E, T <> 0 ->
+    is_derive (fun x : R => - x / T) E (- / T).
+Proof.
+  intros T E HT.
+  apply (is_derive_ext (fun x : R => x * (- / T))).
+  - intro x. apply neg_id_over_T_rewrite. exact HT.
+  - apply is_derive_id_times_const.
+Qed.
+
+Lemma is_derive_exp_neg_id_over_T :
+  forall T E, T <> 0 ->
+    is_derive (fun x : R => exp (- x / T)) E (exp (- E / T) * (- / T)).
+Proof.
+  intros T E HT.
+  pose proof
+    (Derive.is_derive_comp exp (fun x : R => - x / T) E
+                           (exp (- E / T)) (- / T)
+                           (is_derive_exp (- E / T))
+                           (is_derive_neg_id_over_T T E HT))
+    as H.
+  unfold scal in H; simpl in H. unfold mult in H; simpl in H.
+  assert (Heq : (- / T) * exp (- E / T) = exp (- E / T) * (- / T))
+    by ring.
+  rewrite Heq in H. exact H.
+Qed.
+
 Lemma is_derive_neg_T_exp :
   forall T E, T <> 0 ->
     is_derive (fun x : R => - T * exp (- x / T)) E (exp (- E / T)).
 Proof.
   intros T E HT.
-  auto_derive.
-  - exact I.
-  - change (- E / T) with (- E * / T).
-    field. exact HT.
+  pose proof
+    (@Derive.is_derive_mult (fun _ : R => - T)
+       (fun x : R => exp (- x / T)) E 0 (exp (- E / T) * (- / T))
+       (is_derive_const (- T) E)
+       (is_derive_exp_neg_id_over_T T E HT))
+    as H.
+  cbv beta in H.
+  assert (Heq : 0 * exp (- E / T) + (- T) * (exp (- E / T) * (- / T)) =
+                exp (- E / T)) by (field; exact HT).
+  rewrite Heq in H. exact H.
 Qed.
 
 Lemma exp_thermal_rewrite :

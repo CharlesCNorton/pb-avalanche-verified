@@ -99,12 +99,81 @@ Proof.
   set (F := fun x : R => v1 * (x - e1) +
                           (v2 - v1) * (x - e1) * (x - e1) /
                           (2 * (e2 - e1))).
+  (* Building the derivative chain by hand.
+     d/dx (x - e1) = 1 (sum of id and constant)
+     d/dx (v1 * (x - e1)) = v1 (constant rescaling of derivative 1)
+     d/dx (x - e1)^2 = 2 * (x - e1) * 1 (product rule on (x-e1)*(x-e1))
+     d/dx [(v2-v1)/(2(e2-e1)) * (x-e1)^2]
+        = (v2-v1)/(2(e2-e1)) * 2 * (x-e1)
+        = (v2-v1) * (x-e1) / (e2-e1)
+     Sum: v1 + (v2-v1) * (x-e1) / (e2-e1) = interp_segment e1 v1 e2 v2 x. *)
+  assert (Hgap_ne : e2 - e1 <> 0) by lra.
+  assert (Hd_shift : forall x : R,
+            is_derive (fun y : R => y - e1) x 1).
+  { intro x.
+    pose proof (@Derive.is_derive_plus R_AbsRing R_NormedModule
+                  (fun y : R => y) (fun _ : R => - e1) x 1 0
+                  (@is_derive_id R_AbsRing x)
+                  (is_derive_const (- e1) x)) as Hp.
+    cbv beta in Hp.
+    apply (is_derive_ext (fun y : R => plus y (- e1))).
+    - intro y. unfold plus; simpl. unfold Rminus. reflexivity.
+    - assert (Heq : plus (1 : R) 0 = 1) by (unfold plus; simpl; ring).
+      rewrite <- Heq. exact Hp. }
+  assert (Hd_lin : forall x : R,
+            is_derive (fun y : R => v1 * (y - e1)) x v1).
+  { intro x.
+    pose proof (@Derive.is_derive_mult (fun _ : R => v1)
+                  (fun y : R => y - e1) x 0 1
+                  (is_derive_const v1 x) (Hd_shift x)) as Hp.
+    cbv beta in Hp.
+    assert (Heq : 0 * (x - e1) + v1 * 1 = v1) by ring.
+    rewrite Heq in Hp. exact Hp. }
+  assert (Hd_sq : forall x : R,
+            is_derive (fun y : R => (y - e1) * (y - e1)) x (2 * (x - e1))).
+  { intro x.
+    pose proof (@Derive.is_derive_mult (fun y : R => y - e1)
+                  (fun y : R => y - e1) x 1 1
+                  (Hd_shift x) (Hd_shift x)) as Hp.
+    cbv beta in Hp.
+    assert (Heq : 1 * (x - e1) + (x - e1) * 1 = 2 * (x - e1)) by ring.
+    rewrite Heq in Hp. exact Hp. }
+  assert (Hquad_rewrite : forall y : R,
+            ((v2 - v1) / (2 * (e2 - e1))) * ((y - e1) * (y - e1)) =
+            (v2 - v1) * (y - e1) * (y - e1) / (2 * (e2 - e1)))
+    by (intro y; field; exact Hgap_ne).
+  assert (Hd_quad : forall x : R,
+            is_derive (fun y : R => (v2 - v1) * (y - e1) * (y - e1) /
+                                    (2 * (e2 - e1))) x
+                      ((v2 - v1) * (x - e1) / (e2 - e1))).
+  { intro x.
+    apply (is_derive_ext
+             (fun y : R => ((v2 - v1) / (2 * (e2 - e1))) *
+                           ((y - e1) * (y - e1)))).
+    - exact Hquad_rewrite.
+    - pose proof (@Derive.is_derive_mult
+                    (fun _ : R => (v2 - v1) / (2 * (e2 - e1)))
+                    (fun y : R => (y - e1) * (y - e1))
+                    x 0 (2 * (x - e1))
+                    (is_derive_const _ x) (Hd_sq x)) as Hp.
+      cbv beta in Hp.
+      assert (Heq : 0 * ((x - e1) * (x - e1)) +
+                    (v2 - v1) / (2 * (e2 - e1)) * (2 * (x - e1)) =
+                    (v2 - v1) * (x - e1) / (e2 - e1))
+        by (field; exact Hgap_ne).
+      rewrite Heq in Hp. exact Hp. }
   assert (HF_deriv : forall x : R,
             is_derive F x (interp_segment e1 v1 e2 v2 x)).
-  { intro x. unfold F. unfold interp_segment.
-    auto_derive.
-    - exact I.
-    - field. lra. }
+  { intro x.
+    pose proof (@Derive.is_derive_plus R_AbsRing R_NormedModule
+                  (fun y : R => v1 * (y - e1))
+                  (fun y : R => (v2 - v1) * (y - e1) * (y - e1) /
+                                (2 * (e2 - e1)))
+                  x v1 ((v2 - v1) * (x - e1) / (e2 - e1))
+                  (Hd_lin x) (Hd_quad x)) as Hp.
+    cbv beta in Hp.
+    unfold plus in Hp; simpl in Hp.
+    unfold F. unfold interp_segment. exact Hp. }
   assert (Hir : is_RInt (interp_segment e1 v1 e2 v2) e1 e2
                         (minus (F e2) (F e1))).
   { apply (@is_RInt_derive R_CompleteNormedModule F
@@ -237,6 +306,130 @@ Proof.
       destruct rest' as [| [e3 v3] rest''].
       * simpl in IHapp. simpl. lra.
       * lra.
+Qed.
+
+(* === Global continuity of interp_linear on [head_E T, last_E T] === *)
+
+(* Helper: a function defined as the piecewise join of two continuous
+   functions f (on the left of b) and g (on the right of b) that agree
+   at b (f b = g b) is continuous at b. Proved directly via the
+   epsilon-delta characterization. *)
+Lemma continuous_piecewise_at :
+  forall (f g : R -> R) (b : R),
+    continuous f b ->
+    continuous g b ->
+    f b = g b ->
+    continuous (fun x : R => if Rle_lt_dec x b then f x else g x) b.
+Proof.
+  intros f g b Hf Hg Heq.
+  intros P HP.
+  simpl in HP.
+  destruct (Rle_lt_dec b b) as [_ | Hcontra]; [| exfalso; lra].
+  destruct (Hf P HP) as [df Hdf].
+  assert (HP' : locally (g b) P).
+  { rewrite <- Heq. exact HP. }
+  destruct (Hg P HP') as [dg Hdg].
+  exists (mkposreal (Rmin df dg) (Rmin_stable_in_posreal df dg)).
+  intros y Hy. simpl in Hy.
+  destruct (Rle_lt_dec y b) as [_ | _].
+  - apply Hdf.
+    eapply ball_le; [| exact Hy].
+    apply Rmin_l.
+  - apply Hdg.
+    eapply ball_le; [| exact Hy].
+    apply Rmin_r.
+Qed.
+
+Lemma interp_linear_continuous_on :
+  forall T E,
+    sorted_table T ->
+    head_E T <= E <= last_E T ->
+    continuous (interp_linear T) E.
+Proof.
+  induction T as [| [e1 v1] rest IH].
+  - intros E _ [HE1 HE2]. simpl in HE1, HE2.
+    apply continuous_ext with (f := fun _ : R => 0).
+    + intro x. simpl. reflexivity.
+    + apply continuous_const.
+  - intros E Hsort [HE1 HE2].
+    destruct rest as [| [e2 v2] rest'].
+    + (* singleton table: head_E = last_E = e1, so E = e1 *)
+      simpl in HE1, HE2.
+      assert (HEeq : E = e1) by lra. subst E.
+      apply continuous_ext with (f := fun _ : R => v1).
+      * intro x. simpl. reflexivity.
+      * apply continuous_const.
+    + (* at least two points *)
+      simpl in Hsort. destruct Hsort as [Hgap Hsort_tail].
+      assert (Hsort_full : sorted_table ((e2, v2) :: rest')).
+      { destruct rest' as [| [e3 v3] rest''].
+        - simpl. trivial.
+        - simpl. exact Hsort_tail. }
+      assert (Hsort_outer : sorted_table ((e1, v1) :: (e2, v2) :: rest'))
+        by (simpl; split; [exact Hgap | exact Hsort_full]).
+      assert (Hle_tail : e2 <= last_E ((e2, v2) :: rest'))
+        by (apply (head_E_le_last_E ((e2, v2) :: rest')); exact Hsort_full).
+      assert (HE2' : E <= last_E ((e2, v2) :: rest')).
+      { destruct rest' as [| [e3 v3] rest''].
+        - simpl. simpl in HE2. exact HE2.
+        - simpl. simpl in HE2. exact HE2. }
+      (* Trichotomy: E < e2, E = e2, or E > e2. *)
+      destruct (Rlt_le_dec E e2) as [HElt | HEge].
+      * (* E < e2: in a neighborhood of E, interp_linear matches segment *)
+        apply (continuous_ext_loc (interp_linear ((e1, v1) :: (e2, v2) :: rest'))
+                                  (interp_segment e1 v1 e2 v2) E).
+        -- assert (HposR : 0 < (e2 - E) / 2) by lra.
+           exists (mkposreal _ HposR).
+           intros y Hy. simpl in Hy.
+           unfold ball in Hy; simpl in Hy. unfold AbsRing_ball in Hy.
+           unfold abs in Hy; simpl in Hy.
+           unfold minus, plus, opp in Hy; simpl in Hy.
+           apply Rabs_def2 in Hy. destruct Hy as [Hy_lt _].
+           assert (Hy_le : y <= e2).
+           { assert (Hposhalf : 0 < (e2 - E) / 2) by lra. nra. }
+           simpl. destruct (Rle_lt_dec y e2) as [_ | Hcontra];
+             [reflexivity | exfalso; lra].
+        -- apply interp_segment_continuous; exact Hgap.
+      * destruct (Rle_lt_dec E e2) as [HEle | HEgt].
+        ** (* E = e2: use piecewise join *)
+           assert (HEeq : E = e2) by lra. subst E.
+           apply continuous_ext with
+             (f := fun y : R =>
+                     if Rle_lt_dec y e2
+                     then interp_segment e1 v1 e2 v2 y
+                     else interp_linear ((e2, v2) :: rest') y).
+           --- intro y. simpl.
+               destruct (Rle_lt_dec y e2) as [_ | _]; reflexivity.
+           --- apply continuous_piecewise_at.
+               +++ apply interp_segment_continuous; exact Hgap.
+               +++ apply IH; [exact Hsort_full |].
+                   simpl. split; [lra | exact HE2'].
+               +++ rewrite (interp_segment_right e1 v1 e2 v2 Hgap).
+                   (* interp_linear ((e2,v2)::rest') e2 = v2 *)
+                   destruct rest' as [| [e3 v3] rest''].
+                   *** simpl. reflexivity.
+                   *** simpl. destruct (Rle_lt_dec e2 e3) as [_ | Hc].
+                       ---- symmetry. apply interp_segment_left.
+                            simpl in Hsort_tail.
+                            destruct Hsort_tail; lra.
+                       ---- exfalso. simpl in Hsort_tail.
+                            destruct Hsort_tail; lra.
+        ** (* E > e2: in a neighborhood, interp_linear matches tail *)
+           apply (continuous_ext_loc (interp_linear ((e1, v1) :: (e2, v2) :: rest'))
+                                     (interp_linear ((e2, v2) :: rest')) E).
+           --- assert (HposR : 0 < (E - e2) / 2) by lra.
+               exists (mkposreal _ HposR).
+               intros y Hy. simpl in Hy.
+               unfold ball in Hy; simpl in Hy. unfold AbsRing_ball in Hy.
+               unfold abs in Hy; simpl in Hy.
+               unfold minus, plus, opp in Hy; simpl in Hy.
+               apply Rabs_def2 in Hy. destruct Hy as [_ Hy_gt].
+               assert (Hy_gt' : e2 < y).
+               { assert (Hposhalf : 0 < (E - e2) / 2) by lra. nra. }
+               symmetry.
+               apply interp_linear_tail; [lra | exact Hsort_outer].
+           --- apply IH; [exact Hsort_full |].
+               simpl. split; [lra | exact HE2'].
 Qed.
 
 (* === ex_RInt of interp_linear on the entire table interval === *)
