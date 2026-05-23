@@ -2,3 +2,4 @@
 theories/pb_avalanche.v
 theories/pb_avalanche_integral.v
 theories/pb_avalanche_kinetic.v
+theories/pb_avalanche_envelope.v
