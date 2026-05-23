@@ -615,6 +615,111 @@ Module KineticFramework (K : KINETIC_MODEL_PARAMS).
   Qed.
 
   (* ================================================================ *)
+  (* === Competing loss channels (item 12) === *)
+  (* ================================================================ *)
+
+  (* An alpha in the plasma is lost through two competing channels:
+     slowing-down to sub-threshold energy (time constant tau_slow) and
+     escape/confinement loss (time constant tau_confine). The effective
+     residence time is the harmonic combination
+
+       1/tau_eff = 1/tau_slow + 1/tau_confine
+
+     i.e. tau_eff = tau_slow * tau_confine / (tau_slow + tau_confine).
+     Adding a loss channel can only shorten the residence time. *)
+
+  Definition tau_eff (tau_slow tau_confine : R) : R :=
+    tau_slow * tau_confine / (tau_slow + tau_confine).
+
+  Lemma tau_eff_pos :
+    forall ts tc, 0 < ts -> 0 < tc -> 0 < tau_eff ts tc.
+  Proof.
+    intros ts tc Hts Htc. unfold tau_eff.
+    apply Rdiv_lt_0_compat.
+    - apply Rmult_lt_0_compat; assumption.
+    - lra.
+  Qed.
+
+  (* Escape strictly reduces the residence time: tau_eff <= tau_slow. *)
+  Lemma tau_eff_le_slow :
+    forall ts tc, 0 < ts -> 0 < tc -> tau_eff ts tc <= ts.
+  Proof.
+    intros ts tc Hts Htc. unfold tau_eff.
+    apply Rmult_le_reg_r with (ts + tc); [lra |].
+    unfold Rdiv. rewrite Rmult_assoc, Rinv_l, Rmult_1_r; [|lra].
+    rewrite Rmult_plus_distr_l. nra.
+  Qed.
+
+  (* The figure of merit with competing channels (using tau_eff) is
+     bounded by the single-channel kinematic product evaluated at the
+     longer slowing-down time tau_slow. Escape only helps: the secondary
+     rate accounting for confinement loss is no larger than the rate
+     that ignores it. *)
+  Theorem channels_preserve_bound :
+    forall R_prim n_B tau_slow tau_confine,
+      0 < R_prim -> 0 < n_B -> 0 < tau_slow -> 0 < tau_confine ->
+      kinetic_figure_of_merit R_prim n_B (tau_eff tau_slow tau_confine) <=
+      3 * tau_slow * n_B * L_kin * (sigma_E_max * v_E_max).
+  Proof.
+    intros R_prim n_B tau_slow tau_confine HR HnB Hts Htc.
+    pose proof (tau_eff_pos tau_slow tau_confine Hts Htc) as Heff_pos.
+    pose proof (tau_eff_le_slow tau_slow tau_confine Hts Htc) as Heff_le.
+    apply Rle_trans with
+      (3 * (tau_eff tau_slow tau_confine) * n_B * L_kin *
+       (sigma_E_max * v_E_max)).
+    - apply (kinetic_FoM_upper_bound R_prim n_B (tau_eff tau_slow tau_confine)
+               HR HnB Heff_pos).
+    - pose proof L_kin_pos as HL.
+      pose proof sigma_E_max_pos as Hsig.
+      pose proof v_E_max_pos as Hv.
+      apply Rmult_le_compat_r.
+      + apply Rmult_le_pos; lra.
+      + apply Rmult_le_compat_r; [lra |].
+        apply Rmult_le_compat_r; [lra |].
+        apply Rmult_le_compat_l; [lra | exact Heff_le].
+  Qed.
+
+  (* No avalanche with competing channels: if the single-channel bound
+     (at tau_slow) is subcritical, so is the multiplication factor
+     accounting for confinement loss. *)
+  Theorem channels_no_avalanche :
+    forall R_prim n_B tau_slow tau_confine,
+      0 < R_prim -> 0 < n_B -> 0 < tau_slow -> 0 < tau_confine ->
+      3 * tau_slow * n_B * L_kin * (sigma_E_max * v_E_max) < 1 ->
+      R_secondary_kinetic n_B (3 * R_prim) (tau_eff tau_slow tau_confine)
+        / R_prim < 1.
+  Proof.
+    intros R_prim n_B tau_slow tau_confine HR HnB Hts Htc Hsub.
+    pose proof (tau_eff_pos tau_slow tau_confine Hts Htc) as Heff_pos.
+    rewrite (multiplication_factor_kinetic_eq_FoM R_prim n_B
+               (tau_eff tau_slow tau_confine) HR Heff_pos).
+    apply Rle_lt_trans with
+      (3 * tau_slow * n_B * L_kin * (sigma_E_max * v_E_max)).
+    - exact (channels_preserve_bound R_prim n_B tau_slow tau_confine
+               HR HnB Hts Htc).
+    - exact Hsub.
+  Qed.
+
+  (* Helium ash and sub-threshold thermalization: alphas that slow down
+     past E_min become helium ash at thermal energy. These sit strictly
+     below the reactive window [E_min, E_birth] and are excluded from the
+     secondary-rate integral by construction. Accumulation of ash does
+     not enter the reactive integral, hence does not raise the secondary
+     rate. *)
+  Theorem helium_ash_below_reactive_window :
+    forall E, 0 <= E < E_min -> ~ (E_min <= E).
+  Proof. intros E [_ HE]. lra. Qed.
+
+  (* The reactive secondary rate integrates only over [E_min, E_birth];
+     it is insensitive to any ash population at energies below E_min. *)
+  Theorem reactive_window_excludes_ash :
+    forall S tau,
+      R_secondary_kinetic 1 S tau =
+      RInt (fun E => f_slowing S tau E * (sigma_E E * v_E E))
+           E_min E_alpha_birth_MeV.
+  Proof. intros S tau. unfold R_secondary_kinetic. ring. Qed.
+
+  (* ================================================================ *)
   (* === Fokker-Planck steady state === *)
   (* ================================================================ *)
 
@@ -800,3 +905,6 @@ Print Assumptions ConstantKineticFramework.R_secondary_bilinear_factorization.
 Print Assumptions ConstantKineticFramework.multiplication_factor_kinetic_eq_FoM.
 Print Assumptions ConstantKineticFramework.kinetic_FoM_upper_bound.
 Print Assumptions ConstantKineticFramework.kinetic_no_avalanche.
+Print Assumptions ConstantKineticFramework.kinetic_FoM_sandwich.
+Print Assumptions ConstantKineticFramework.channels_preserve_bound.
+Print Assumptions ConstantKineticFramework.channels_no_avalanche.
