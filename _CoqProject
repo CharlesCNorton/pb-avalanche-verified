@@ -1,2 +1,3 @@
 -R theories PBAvalanche
 theories/pb_avalanche.v
+theories/pb_avalanche_integral.v
