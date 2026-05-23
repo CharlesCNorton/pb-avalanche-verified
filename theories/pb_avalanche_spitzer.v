@@ -384,6 +384,115 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Derived Coulomb-log envelope (item 18) === *)
+(* ================================================================== *)
+
+(* The Coulomb logarithm ln Lambda arises from cutting off the
+   Rutherford integral at the Debye length (maximum impact parameter,
+   above which plasma screening kicks in) and the closer of the
+   classical-trajectory and de-Broglie minimum impact parameters
+   (below which the Born approximation fails or quantum effects
+   dominate). We expose lambda_Debye and b_min as abstract functions
+   of (T, n_e) and (T, m) with the right dimensional content, and
+   show that under physically-realistic bounds the derived ln Lambda
+   falls in the [10, 25] range used by admissible_coulomb_log. *)
+
+(* Debye length: lambda_D = sqrt(eps_0 * k_B * T / (n_e * e^2)).
+   We treat the prefactor eps_0 * k_B / e^2 as a single dimensional
+   constant (call it lambda_const) and write
+     lambda_Debye(T, n_e) := sqrt(lambda_const * T / n_e). *)
+Definition lambda_Debye (lambda_const T n_e : R) : R :=
+  sqrt (lambda_const * T / n_e).
+
+Lemma lambda_Debye_pos :
+  forall lambda_const T n_e,
+    0 < lambda_const -> 0 < T -> 0 < n_e ->
+    0 < lambda_Debye lambda_const T n_e.
+Proof.
+  intros. unfold lambda_Debye.
+  apply sqrt_lt_R0.
+  apply Rdiv_lt_0_compat.
+  - apply Rmult_lt_0_compat; assumption.
+  - assumption.
+Qed.
+
+(* Quantum minimum: b_min_quantum = hbar / sqrt(m * k_B * T).
+   Treating the prefactor hbar / sqrt(k_B) as a single constant
+   q_const, b_min_quantum(T, m) := q_const / sqrt(m * T). *)
+Definition b_min_quantum (q_const T m : R) : R :=
+  q_const / sqrt (m * T).
+
+Lemma b_min_quantum_pos :
+  forall q_const T m,
+    0 < q_const -> 0 < T -> 0 < m ->
+    0 < b_min_quantum q_const T m.
+Proof.
+  intros. unfold b_min_quantum.
+  apply Rdiv_lt_0_compat; [assumption |].
+  apply sqrt_lt_R0.
+  apply Rmult_lt_0_compat; assumption.
+Qed.
+
+(* Classical minimum: b_min_classical = e^2 / (4π ε_0 k_B T). For
+   the dimensional structure we absorb the constant into c_const:
+   b_min_classical(T) := c_const / T. *)
+Definition b_min_classical (c_const T : R) : R := c_const / T.
+
+Lemma b_min_classical_pos :
+  forall c_const T, 0 < c_const -> 0 < T -> 0 < b_min_classical c_const T.
+Proof.
+  intros. unfold b_min_classical. apply Rdiv_lt_0_compat; assumption.
+Qed.
+
+(* The cutoff is the max of the two. *)
+Definition b_min (q_const c_const T m : R) : R :=
+  Rmax (b_min_quantum q_const T m) (b_min_classical c_const T).
+
+Lemma b_min_pos :
+  forall q_const c_const T m,
+    0 < q_const -> 0 < c_const -> 0 < T -> 0 < m ->
+    0 < b_min q_const c_const T m.
+Proof.
+  intros q_const c_const T m Hq Hc HT Hm. unfold b_min.
+  apply Rlt_le_trans with (b_min_quantum q_const T m).
+  - apply b_min_quantum_pos; assumption.
+  - apply Rmax_l.
+Qed.
+
+(* Derived Coulomb logarithm: ln(lambda_Debye / b_min). *)
+Definition coulomb_log_derived (lambda_const q_const c_const T n_e m : R) : R :=
+  ln (lambda_Debye lambda_const T n_e / b_min q_const c_const T m).
+
+(* Under physically-realistic bounds — namely that the ratio
+   lambda_Debye / b_min lies in [exp(10), exp(25)] — the derived
+   Coulomb log falls in [10, 25]. This is the envelope statement:
+   the bracketed numerical bound on the ratio is the physical input,
+   and the [10, 25] log range is its symbolic consequence. *)
+Theorem coulomb_log_derived_envelope :
+  forall lambda_const q_const c_const T n_e m,
+    0 < lambda_const -> 0 < q_const -> 0 < c_const ->
+    0 < T -> 0 < n_e -> 0 < m ->
+    exp 10 <= lambda_Debye lambda_const T n_e /
+              b_min q_const c_const T m <= exp 25 ->
+    admissible_coulomb_log
+      (coulomb_log_derived lambda_const q_const c_const T n_e m).
+Proof.
+  intros lambda_const q_const c_const T n_e m
+         Hl Hq Hc HT Hn Hm [Hratio_lo Hratio_hi].
+  unfold admissible_coulomb_log, ln_Lambda_min, ln_Lambda_max,
+         coulomb_log_derived.
+  pose proof (lambda_Debye_pos lambda_const T n_e Hl HT Hn) as HlD.
+  pose proof (b_min_pos q_const c_const T m Hq Hc HT Hm) as Hbm.
+  assert (Hratio_pos : 0 < lambda_Debye lambda_const T n_e /
+                           b_min q_const c_const T m).
+  { apply Rdiv_lt_0_compat; assumption. }
+  split.
+  - rewrite <- (ln_exp 10). apply Coquelicot.Rcomplements.ln_le; [|exact Hratio_lo].
+    apply exp_pos.
+  - rewrite <- (ln_exp 25). apply Coquelicot.Rcomplements.ln_le; [exact Hratio_pos | exact Hratio_hi].
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 

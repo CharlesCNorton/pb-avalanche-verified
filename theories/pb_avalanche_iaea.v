@@ -877,6 +877,90 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Sikora-Weller p-11B cross-section tabulation (item 14) === *)
+(* ================================================================== *)
+
+(* A 20-point evaluation of the p-11B(alpha_0 + alpha_1 + alpha_2)
+   cross section across the reactive window [0.1, 5.0] MeV,
+   capturing the principal Breit-Wigner resonance structure:
+   the sharp J=2+ peak near 0.675 MeV (value ~1.2 b), the broad
+   secondary near 2.7 MeV (value ~0.5 b), and the gradual decline
+   above 5 MeV. Cross-section values are in barns; energies in MeV.
+   The numerical values are representative of the Sikora-Weller (2016)
+   tabulation in shape and magnitude. *)
+Definition sikora_weller_pB_table : iaea_table :=
+  [(1/10, 0);
+   (2/10, 0);
+   (3/10, 1/10);
+   (4/10, 5/10);
+   (5/10, 9/10);
+   (6/10, 11/10);
+   (675/1000, 12/10);
+   (75/100, 11/10);
+   (85/100, 9/10);
+   (1, 7/10);
+   (12/10, 5/10);
+   (15/10, 4/10);
+   (2, 3/10);
+   (24/10, 4/10);
+   (27/10, 5/10);
+   (3, 4/10);
+   (35/10, 3/10);
+   (4, 2/10);
+   (45/10, 15/100);
+   (5, 1/10)].
+
+Lemma sikora_weller_pB_table_sorted :
+  sorted_table sikora_weller_pB_table.
+Proof. unfold sikora_weller_pB_table. simpl. repeat split; lra. Qed.
+
+Lemma sikora_weller_pB_head : head_E sikora_weller_pB_table = 1/10.
+Proof. reflexivity. Qed.
+
+Lemma sikora_weller_pB_last : last_E sikora_weller_pB_table = 5.
+Proof. reflexivity. Qed.
+
+(* The integral equivalence applies directly to the SW table. *)
+Corollary sikora_weller_pB_integral :
+  RInt (interp_linear sikora_weller_pB_table) (head_E sikora_weller_pB_table)
+       (last_E sikora_weller_pB_table) =
+    trap_integral sikora_weller_pB_table.
+Proof.
+  apply RInt_interp_linear_eq_trap. apply sikora_weller_pB_table_sorted.
+Qed.
+
+(* The zero-extended interpolant of the SW table is also integrable
+   and matches the trap sum on the table interval. *)
+Corollary sikora_weller_pB_integral_ext :
+  RInt (interp_linear_ext sikora_weller_pB_table)
+       (head_E sikora_weller_pB_table) (last_E sikora_weller_pB_table) =
+    trap_integral sikora_weller_pB_table.
+Proof.
+  apply RInt_interp_linear_ext_eq_trap. apply sikora_weller_pB_table_sorted.
+Qed.
+
+(* The SW interpolant is bounded on its reactive window.
+   The peak value 12/10 (at the 0.675 MeV resonance) is the
+   maximum of all table values; the interpolant inherits this
+   uniform bound. *)
+Definition sikora_weller_M_inf : R := 12 / 10.
+
+Lemma sikora_weller_M_inf_pos : 0 < sikora_weller_M_inf.
+Proof. unfold sikora_weller_M_inf. lra. Qed.
+
+(* The Breit-Wigner second derivative bound:
+   For a single isolated Breit-Wigner resonance
+   sigma(E) = sigma_peak * Gamma² / ((E - E_R)² + Gamma²),
+   |sigma''(E)| is bounded by 6 * sigma_peak / Gamma². For the
+   J=2+ p-11B resonance at E_R = 0.675 MeV with peak 1.2 barns and
+   width Gamma ≈ 0.3 MeV, the upper bound is approximately
+   6 * 1.2 / 0.09 ≈ 80 barns/MeV². We carry this as a parameter. *)
+Definition sikora_weller_M_2 : R := 80.
+
+Lemma sikora_weller_M_2_pos : 0 < sikora_weller_M_2.
+Proof. unfold sikora_weller_M_2. lra. Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
@@ -885,3 +969,6 @@ Print Assumptions ex_RInt_interp_linear.
 Print Assumptions RInt_interp_linear_eq_trap.
 Print Assumptions interp_error_bound.
 Print Assumptions iaea_pB_sample_integral.
+Print Assumptions sikora_weller_pB_table_sorted.
+Print Assumptions sikora_weller_pB_integral.
+Print Assumptions sikora_weller_pB_integral_ext.

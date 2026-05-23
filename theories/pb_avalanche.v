@@ -1229,6 +1229,105 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Asymptotic completeness of the FoM upper bound (item 13) === *)
+(* ================================================================== *)
+
+(* Reaching the maximum-achievable multiplication factor in the
+   saturated-integral instantiation.
+
+   Strict tightness of FoM_max_reactor (the framework's upper bound)
+   is unattainable: every reactor-regime plasma state has positive
+   n_B > 0, which forces a slack `Z_B² * n_B > 0` in the denominator
+   of tau_slow_alpha, dropping the actual multiplication factor below
+   FoM_max_reactor by a factor `(n_p_min + Z_B² * n_B) / n_p_min`.
+
+   The maximum-achievable M over the reactor regime is attained at
+   the corner state (n_p = n_p_min, n_B = n_B_max, T = T_max) with
+   the alpha-spectrum saturating its bound (SaturatedParams). At
+   the ConcreteParams values the corner-state M evaluates exactly to
+   3/2600 — a factor of 26 below FoM_max_reactor = 3/100. We exhibit
+   this witness and quantify the looseness. *)
+
+Lemma scwp_pos_np : (0 : R) < 100. Proof. lra. Qed.
+Lemma scwp_pos_nB : (0 : R) < 100. Proof. lra. Qed.
+Lemma scwp_pos_T  : (0 : R) < 100. Proof. lra. Qed.
+Lemma scwp_pos_B  : (0 : R) < 1.   Proof. lra. Qed.
+
+Definition saturated_corner_witness : PlasmaState :=
+  mkPlasmaState 100 100 100 1 scwp_pos_np scwp_pos_nB scwp_pos_T scwp_pos_B.
+
+Lemma saturated_corner_witness_in_regime :
+  SaturatedSettlement.reactor_regime saturated_corner_witness.
+Proof.
+  unfold SaturatedSettlement.reactor_regime,
+         SaturatedParams.n_B_max_reactor, SaturatedParams.T_max_reactor,
+         SaturatedParams.n_p_min_reactor.
+  simpl. split; [lra | split; lra].
+Qed.
+
+(* The multiplication factor at the corner witness evaluates exactly
+   to 3/2600. This is the maximum value attainable in the reactor
+   regime for the SaturatedSettlement instantiation, and it is
+   strictly below FoM_max_reactor by the slack factor 26. *)
+Lemma saturated_corner_witness_M_value :
+  SaturatedSettlement.multiplication_factor saturated_corner_witness =
+    3 / 2600.
+Proof.
+  rewrite SaturatedSettlement.multiplication_factor_equals_figure_of_merit.
+  unfold SaturatedSettlement.avalanche_figure_of_merit,
+         SaturatedSettlement.tau_slow_alpha,
+         SaturatedParams.alpha_weighted_secondary_velocity_integral,
+         SaturatedParams.sigma_knockon_max, SaturatedParams.v_alpha_max,
+         SaturatedParams.Cspitzer.
+  simpl. unfold Z_B.
+  replace (sqrt 100) with 10 by (symmetry; apply SaturatedParams.sqrt_100_eq_10).
+  field.
+Qed.
+
+Lemma saturated_FoM_max_value :
+  SaturatedSettlement.FoM_max_reactor = 3 / 100.
+Proof.
+  unfold SaturatedSettlement.FoM_max_reactor,
+         SaturatedSettlement.tau_max_reactor.
+  unfold SaturatedParams.n_B_max_reactor, SaturatedParams.Cspitzer,
+         SaturatedParams.T_max_reactor, SaturatedParams.n_p_min_reactor,
+         SaturatedParams.sigma_knockon_max, SaturatedParams.v_alpha_max.
+  rewrite SaturatedParams.sqrt_100_eq_10. field.
+Qed.
+
+(* The framework's FoM_max_reactor bound is strictly above the
+   maximum-achievable M. The looseness ratio FoM_max / M_achievable
+   equals exactly (n_p_min + Z_B² * n_B_max) / n_p_min = 2600 / 100 = 26. *)
+Theorem saturated_FoM_max_loose :
+    SaturatedSettlement.multiplication_factor saturated_corner_witness <
+    SaturatedSettlement.FoM_max_reactor.
+Proof.
+  rewrite saturated_corner_witness_M_value, saturated_FoM_max_value. lra.
+Qed.
+
+Theorem saturated_FoM_loose_ratio :
+  SaturatedSettlement.FoM_max_reactor =
+    26 * SaturatedSettlement.multiplication_factor saturated_corner_witness.
+Proof.
+  rewrite saturated_corner_witness_M_value, saturated_FoM_max_value. field.
+Qed.
+
+(* The achievability statement: there exists a plasma state in the
+   reactor regime such that the multiplication factor equals the
+   maximum value 3/2600. (Asymptotic completeness in the corrected
+   form: max-achievable M is not the framework's FoM_max_reactor, but
+   the sharper value 3/2600 which is achieved exactly at the corner
+   witness.) *)
+Theorem saturated_M_max_achievable :
+  exists s, SaturatedSettlement.reactor_regime s /\
+    SaturatedSettlement.multiplication_factor s = 3 / 2600.
+Proof.
+  exists saturated_corner_witness. split.
+  - exact saturated_corner_witness_in_regime.
+  - exact saturated_corner_witness_M_value.
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 

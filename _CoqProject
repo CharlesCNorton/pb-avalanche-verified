@@ -7,6 +7,12 @@ theories/pb_avalanche_thermal.v
 theories/pb_avalanche_spitzer.v
 theories/pb_avalanche_iaea.v
 theories/pb_avalanche_units.v
+theories/pb_avalanche_units_q.v
+theories/pb_avalanche_dr_framework.v
+theories/pb_avalanche_spitzer_constants.v
+theories/pb_avalanche_gamow.v
+theories/pb_avalanche_fokker_planck.v
+theories/pb_avalanche_sw_kinetic.v
 theories/pb_avalanche_final.v
 theories/pb_avalanche_romberg.v
 theories/pb_avalanche_audit.v

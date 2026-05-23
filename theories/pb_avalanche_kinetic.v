@@ -1020,6 +1020,131 @@ Module KineticFramework (K : KINETIC_MODEL_PARAMS).
     - apply (is_derive_const (- S) E).
   Qed.
 
+  (* ================================================================ *)
+  (* === Energy-dependent Coulomb slowing-down time (item 12) === *)
+  (* ================================================================ *)
+
+  (* The constant-tau model Edot(E) := -E / tau is a simplification. The
+     proper Spitzer-Trubnikov picture has slowing-down time
+     tau_s(E) ∝ sqrt(E) (since the Coulomb energy-loss rate dE/dt
+     scales with v^3 / E ∝ E^{1/2}, giving the characteristic time
+     E / |dE/dt| = E / (k E^{1/2}) = E^{1/2} / k). We model this
+     as tau_s_E_dep tau0 E := tau0 * sqrt(E / E_birth), normalized
+     to equal tau0 at the birth energy. The corresponding energy-loss
+     rate is
+
+       Edot_E_dep(E) = -E / tau_s_E_dep tau0 E
+                     = -sqrt(E * E_birth) / tau0.
+
+     The steady-state spectrum (constant flux) gains an E^{1/2}
+     correction relative to the constant-tau case:
+
+       f_slowing_E_dep(E) = S * tau_s_E_dep tau0 E / E
+                          = S * tau0 / sqrt(E * E_birth).
+
+     This is integrable on [E_min, E_birth] since 1/sqrt(E) is. *)
+
+  Definition tau_s_E_dep (tau0 : R) (E : R) : R :=
+    tau0 * sqrt (E / E_alpha_birth_MeV).
+
+  Lemma tau_s_E_dep_pos :
+    forall tau0 E, 0 < tau0 -> 0 < E -> 0 < tau_s_E_dep tau0 E.
+  Proof.
+    intros tau0 E Htau0 HE.
+    unfold tau_s_E_dep.
+    apply Rmult_lt_0_compat; [exact Htau0 |].
+    apply sqrt_lt_R0.
+    apply Rdiv_lt_0_compat.
+    - exact HE.
+    - exact E_alpha_birth_kinetic_pos.
+  Qed.
+
+  Definition Edot_E_dep (tau0 : R) (E : R) : R := - E / tau_s_E_dep tau0 E.
+
+  (* Closed form: Edot_E_dep(E) = -sqrt(E * E_birth) / tau0. Derived
+     from -E / (tau0 * sqrt(E / E_birth)) by extracting the square root. *)
+  Lemma Edot_E_dep_closed_form :
+    forall tau0 E, 0 < tau0 -> 0 < E ->
+      Edot_E_dep tau0 E = - sqrt (E * E_alpha_birth_MeV) / tau0.
+  Proof.
+    intros tau0 E Htau0 HE.
+    unfold Edot_E_dep, tau_s_E_dep.
+    assert (HEbirth : 0 < E_alpha_birth_MeV) by exact E_alpha_birth_kinetic_pos.
+    assert (Htau0_ne : tau0 <> 0) by lra.
+    assert (Hratio_pos : 0 < E / E_alpha_birth_MeV)
+      by (apply Rdiv_lt_0_compat; assumption).
+    assert (Hsqrt_pos : 0 < sqrt (E / E_alpha_birth_MeV))
+      by (apply sqrt_lt_R0; exact Hratio_pos).
+    (* -E / (tau0 * sqrt(E/E_birth))
+       = - (sqrt(E))^2 / (tau0 * sqrt(E) / sqrt(E_birth))
+       = - sqrt(E) * sqrt(E_birth) / tau0
+       = - sqrt(E * E_birth) / tau0 *)
+    rewrite (sqrt_div_alt E E_alpha_birth_MeV HEbirth).
+    assert (HsqE : E = sqrt E * sqrt E)
+      by (symmetry; apply sqrt_sqrt; lra).
+    assert (Hsqrt_E_pos : 0 < sqrt E) by (apply sqrt_lt_R0; exact HE).
+    assert (Hsqrt_Eb_pos : 0 < sqrt E_alpha_birth_MeV)
+      by (apply sqrt_lt_R0; exact HEbirth).
+    rewrite sqrt_mult by lra.
+    rewrite HsqE at 1. field.
+    repeat split.
+    - exact Htau0_ne.
+    - apply Rgt_not_eq. exact Hsqrt_Eb_pos.
+    - apply Rgt_not_eq. exact Hsqrt_E_pos.
+  Qed.
+
+  (* Steady-state spectrum with energy-dependent tau_s:
+     f_slowing_E_dep(E) := S * tau_s_E_dep tau0 E / E. *)
+  Definition f_slowing_E_dep (S tau0 E : R) : R :=
+    S * tau_s_E_dep tau0 E / E.
+
+  (* The product Edot_E_dep * f_slowing_E_dep is the constant flux -S,
+     just as in the constant-tau case. The flux constancy is the
+     model's invariant content; what changes from the constant-tau
+     setup is the spectrum's E^{-1/2} scaling. *)
+  Theorem slowing_flux_E_dep_constant :
+    forall S tau0 E, 0 < tau0 -> 0 < E ->
+      Edot_E_dep tau0 E * f_slowing_E_dep S tau0 E = - S.
+  Proof.
+    intros S tau0 E Htau0 HE.
+    unfold Edot_E_dep, f_slowing_E_dep, tau_s_E_dep.
+    assert (HEbirth : 0 < E_alpha_birth_MeV) by exact E_alpha_birth_kinetic_pos.
+    assert (Htau0_ne : tau0 <> 0) by lra.
+    assert (Hratio_pos : 0 < E / E_alpha_birth_MeV)
+      by (apply Rdiv_lt_0_compat; assumption).
+    assert (Hsqrt_pos : 0 < sqrt (E / E_alpha_birth_MeV))
+      by (apply sqrt_lt_R0; exact Hratio_pos).
+    field. repeat split; lra.
+  Qed.
+
+  (* The spectrum gains an E^{-1/2} factor compared to the constant-tau
+     case: f_E_dep(E) = (S * tau0 / sqrt E_birth) * (1 / sqrt E). *)
+  Lemma f_slowing_E_dep_scaling :
+    forall S tau0 E, 0 < tau0 -> 0 < E ->
+      f_slowing_E_dep S tau0 E =
+      (S * tau0 / sqrt E_alpha_birth_MeV) * (sqrt E / E).
+  Proof.
+    intros S tau0 E Htau0 HE.
+    unfold f_slowing_E_dep, tau_s_E_dep.
+    assert (HEbirth : 0 < E_alpha_birth_MeV) by exact E_alpha_birth_kinetic_pos.
+    assert (HEne : E <> 0) by lra.
+    assert (HsqEbirth_ne : sqrt E_alpha_birth_MeV <> 0).
+    { apply Rgt_not_eq, sqrt_lt_R0; lra. }
+    rewrite (sqrt_div_alt E E_alpha_birth_MeV HEbirth).
+    field. split; assumption.
+  Qed.
+
+  (* The energy-dependent slowing-down time agrees with the constant
+     model exactly at the birth energy. *)
+  Lemma tau_s_E_dep_at_birth :
+    forall tau0, 0 < tau0 ->
+      tau_s_E_dep tau0 E_alpha_birth_MeV = tau0.
+  Proof.
+    intros tau0 Htau0. unfold tau_s_E_dep.
+    rewrite Rdiv_diag by (apply Rgt_not_eq, E_alpha_birth_kinetic_pos).
+    rewrite sqrt_1. ring.
+  Qed.
+
 End KineticFramework.
 
 (* ================================================================== *)

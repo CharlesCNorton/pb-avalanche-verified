@@ -33,6 +33,12 @@ From PBAvalanche Require Import
   pb_avalanche_spitzer
   pb_avalanche_iaea
   pb_avalanche_units
+  pb_avalanche_units_q
+  pb_avalanche_dr_framework
+  pb_avalanche_spitzer_constants
+  pb_avalanche_gamow
+  pb_avalanche_fokker_planck
+  pb_avalanche_sw_kinetic
   pb_avalanche_romberg
   pb_avalanche_final.
 
@@ -79,6 +85,12 @@ Print Assumptions physical_witness_no_avalanche.
 Print Assumptions physical_FoM_max_value.
 Print Assumptions physical_multiplication_factor_bound.
 Print Assumptions physical_safety_margin.
+Print Assumptions saturated_corner_witness_in_regime.
+Print Assumptions saturated_corner_witness_M_value.
+Print Assumptions saturated_FoM_max_value.
+Print Assumptions saturated_FoM_max_loose.
+Print Assumptions saturated_FoM_loose_ratio.
+Print Assumptions saturated_M_max_achievable.
 
 (* ================================================================== *)
 (* === pb_avalanche_integral.v — Coquelicot-derived bound + 2 more === *)
@@ -138,6 +150,11 @@ Print Assumptions ConstantKineticFramework.slowing_down_steady_state.
 Print Assumptions ConstantKineticFramework.source_equals_sink.
 Print Assumptions ConstantKineticFramework.flux_carries_source.
 Print Assumptions ConstantKineticFramework.slowing_flux_steady_derivative.
+Print Assumptions ConstantKineticFramework.tau_s_E_dep_pos.
+Print Assumptions ConstantKineticFramework.Edot_E_dep_closed_form.
+Print Assumptions ConstantKineticFramework.slowing_flux_E_dep_constant.
+Print Assumptions ConstantKineticFramework.f_slowing_E_dep_scaling.
+Print Assumptions ConstantKineticFramework.tau_s_E_dep_at_birth.
 
 (* ================================================================== *)
 (* === pb_avalanche_envelope.v — admissibility + Hora regime === *)
@@ -193,6 +210,9 @@ Print Assumptions slowing_flux_value.
 Print Assumptions slowing_steady_state.
 Print Assumptions source_balances_sink.
 Print Assumptions tau_spitzer_eq_abstract.
+Print Assumptions lambda_Debye_pos.
+Print Assumptions b_min_pos.
+Print Assumptions coulomb_log_derived_envelope.
 Print Assumptions n_eff_ion_scatter_pos.
 
 (* ================================================================== *)
@@ -222,6 +242,11 @@ Print Assumptions interp_segment_curvature_error.
 Print Assumptions iaea_pB_sample_sorted.
 Print Assumptions iaea_pB_sample_trap_value.
 Print Assumptions iaea_pB_sample_integral.
+Print Assumptions sikora_weller_pB_table_sorted.
+Print Assumptions sikora_weller_pB_integral.
+Print Assumptions sikora_weller_pB_integral_ext.
+Print Assumptions sikora_weller_M_inf_pos.
+Print Assumptions sikora_weller_M_2_pos.
 
 (* ================================================================== *)
 (* === pb_avalanche_units.v — dimensional types === *)
@@ -258,6 +283,71 @@ Print Assumptions multiplication_factor_unit_dimensionless.
 Print Assumptions rate_over_rate_zero.
 Print Assumptions velocity_times_time_is_length.
 Print Assumptions cross_section_velocity_is_sigma_v.
+
+(* ================================================================== *)
+(* === pb_avalanche_units_q.v — Q-exponent dimensional types === *)
+(* ================================================================== *)
+
+Print Assumptions unit_mul_q_zero_l.
+Print Assumptions unit_mul_q_zero_r.
+Print Assumptions unit_mul_q_comm.
+Print Assumptions unit_mul_q_assoc.
+Print Assumptions unit_mul_q_inv_r.
+Print Assumptions unit_mul_q_inv_l.
+Print Assumptions unit_inv_q_inv.
+Print Assumptions unit_pow_q_zero.
+Print Assumptions unit_pow_q_one.
+Print Assumptions unit_pow_q_add.
+Print Assumptions sqrt_unit_squared.
+Print Assumptions sqrt_T_unit_squared_is_T.
+Print Assumptions inject_Z_zero_unit.
+Print Assumptions inject_Z_unit_mul.
+
+(* ================================================================== *)
+(* === pb_avalanche_dr_framework.v — DR-typed framework === *)
+(* ================================================================== *)
+
+Print Assumptions dr_multiplication_factor_value.
+Print Assumptions dr_rate_ratio_unit.
+Print Assumptions dr_rate_ratio_value.
+Print Assumptions reaction_freq_unit_value.
+Print Assumptions dr_reaction_freq_value.
+Print Assumptions rate_two_density_unit_value.
+Print Assumptions dr_R_secondary_value.
+Print Assumptions rate_two_density_ratio_dimensionless.
+
+(* ================================================================== *)
+(* === pb_avalanche_spitzer_constants.v — physical constants === *)
+(* ================================================================== *)
+
+Print Assumptions eps_0_sq_unit_q_value.
+Print Assumptions tau_signature_components.
+
+(* ================================================================== *)
+(* === pb_avalanche_gamow.v — Gamow cross section === *)
+(* ================================================================== *)
+
+Print Assumptions b_G_pos.
+Print Assumptions gamow_factor_pos.
+Print Assumptions gamow_factor_decreasing.
+Print Assumptions gamow_peak_pos.
+Print Assumptions gamow_peak_monotone_T.
+
+(* ================================================================== *)
+(* === pb_avalanche_fokker_planck.v — distributional FP === *)
+(* ================================================================== *)
+
+Print Assumptions FP_drift_is_FP_op_with_zero_D.
+Print Assumptions FP_drift_vanishes_at.
+Print Assumptions FP_drift_slowing.
+Print Assumptions FP_op_slowing_no_diffusion.
+
+(* ================================================================== *)
+(* === pb_avalanche_sw_kinetic.v — SW kinetic instance === *)
+(* ================================================================== *)
+
+Print Assumptions SW_K_sigma_v_product.
+Print Assumptions SW_K_FoM_upper_bound.
 
 (* ================================================================== *)
 (* === pb_avalanche_romberg.v — Richardson extrapolation === *)
