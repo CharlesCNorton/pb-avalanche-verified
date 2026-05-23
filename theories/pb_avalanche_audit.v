@@ -33,6 +33,7 @@ From PBAvalanche Require Import
   pb_avalanche_spitzer
   pb_avalanche_iaea
   pb_avalanche_units
+  pb_avalanche_romberg
   pb_avalanche_final.
 
 (* ================================================================== *)
@@ -151,6 +152,9 @@ Print Assumptions admissible_product_subcritical.
 Print Assumptions envelope_subcritical.
 Print Assumptions hora_admissible.
 Print Assumptions hora_regime_no_avalanche.
+Print Assumptions iter_product_subcritical.
+Print Assumptions iter_witness_no_avalanche.
+Print Assumptions iter_witness_monotone_in_B.
 
 (* ================================================================== *)
 (* === pb_avalanche_thermal.v — Maxwellian-averaged reactivity === *)
@@ -163,6 +167,9 @@ Print Assumptions is_derive_neg_T_exp.
 Print Assumptions continuous_exp_thermal.
 Print Assumptions RInt_exp_thermal.
 Print Assumptions exp_thermal_pos.
+Print Assumptions exp_neg_b_over_T_lim.
+Print Assumptions T_times_1_minus_exp_lim.
+Print Assumptions RInt_exp_thermal_half_line.
 
 (* ================================================================== *)
 (* === pb_avalanche_spitzer.v — Spitzer-Trubnikov + Coulomb log === *)
@@ -202,10 +209,16 @@ Print Assumptions interp_linear_tail.
 Print Assumptions head_E_le_last_E.
 Print Assumptions continuous_piecewise_at.
 Print Assumptions interp_linear_continuous_on.
+Print Assumptions interp_linear_ext_below.
+Print Assumptions interp_linear_ext_above.
+Print Assumptions interp_linear_ext_inside.
+Print Assumptions ex_RInt_interp_linear_ext.
+Print Assumptions RInt_interp_linear_ext_eq_trap.
 Print Assumptions ex_RInt_interp_linear.
 Print Assumptions RInt_interp_linear_split.
 Print Assumptions RInt_interp_linear_eq_trap.
 Print Assumptions interp_error_bound.
+Print Assumptions interp_segment_curvature_error.
 Print Assumptions iaea_pB_sample_sorted.
 Print Assumptions iaea_pB_sample_trap_value.
 Print Assumptions iaea_pB_sample_integral.
@@ -245,6 +258,19 @@ Print Assumptions multiplication_factor_unit_dimensionless.
 Print Assumptions rate_over_rate_zero.
 Print Assumptions velocity_times_time_is_length.
 Print Assumptions cross_section_velocity_is_sigma_v.
+
+(* ================================================================== *)
+(* === pb_avalanche_romberg.v — Richardson extrapolation === *)
+(* ================================================================== *)
+
+Print Assumptions interior_sum_const.
+Print Assumptions trap_composite_const_S.
+Print Assumptions trap_pow2_const.
+Print Assumptions romberg_table_const.
+Print Assumptions romberg_const.
+Print Assumptions romberg_RInt_const.
+Print Assumptions romberg_level0.
+Print Assumptions romberg_single.
 
 (* ================================================================== *)
 (* === pb_avalanche_final.v — aggregate settlement === *)

@@ -154,6 +154,78 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Improper integral over [0, +infty) (item 11) === *)
+(* ================================================================== *)
+
+(* The Boltzmann weight integrated over the half-line [0, +infty)
+   evaluates to T:
+
+       integral_0^{+infty} exp(-E/T) dE = T.
+
+   Formally captured here as a limiting statement of the finite-interval
+   integrals: for any sequence b_n -> +infty,
+   RInt (fun E => exp(-E/T)) 0 b_n -> T. This is equivalent to the
+   Coquelicot is_RInt_gen-shaped improper integral assertion. *)
+
+Lemma exp_neg_b_over_T_lim :
+  forall T, 0 < T ->
+    is_lim (fun b : R => exp (- b / T)) p_infty 0.
+Proof.
+  intros T HT.
+  assert (HTne : T <> 0) by lra.
+  apply (is_lim_ext (fun b : R => exp ((- / T) * b))).
+  - intro b. f_equal. field. exact HTne.
+  - assert (Hneg : - / T < 0) by (apply Ropp_lt_gt_0_contravar;
+      apply Rinv_0_lt_compat; exact HT).
+    (* lim_{b->+inf} exp((-1/T) * b) = lim_{y->-inf} exp y = 0
+       via composition. *)
+    apply (is_lim_comp exp (fun b : R => (- / T) * b) p_infty 0 m_infty).
+    + apply is_lim_exp_m.
+    + apply (is_lim_ext (fun b : R => b * (- / T))).
+      * intro b. ring.
+      * replace m_infty with (Rbar_mult p_infty (- / T)).
+        -- apply is_lim_scal_r. apply is_lim_id.
+        -- simpl. destruct (Rle_dec 0 (- / T)) as [Hc | _]; [exfalso; lra |].
+           destruct (Rle_dec (- / T) 0) as [Hle | Hc']; [|exfalso; lra].
+           destruct (Rle_lt_or_eq_dec (- / T) 0 Hle) as [_ | Heq];
+             [reflexivity | exfalso; lra].
+    + apply filter_forall. intros y. discriminate.
+Qed.
+
+Lemma T_times_1_minus_exp_lim :
+  forall T, 0 < T ->
+    is_lim (fun b : R => T * (1 - exp (- b / T))) p_infty T.
+Proof.
+  intros T HT.
+  pose proof (is_lim_scal_l (fun b : R => 1 - exp (- b / T)) T p_infty 1)
+    as Hscal_proto.
+  assert (Hinner : is_lim (fun b : R => 1 - exp (- b / T)) p_infty 1).
+  { pose proof (is_lim_minus' (fun _ : R => 1)
+                  (fun b : R => exp (- b / T)) p_infty 1 0
+                  (is_lim_const 1 p_infty)
+                  (exp_neg_b_over_T_lim T HT)) as Hm.
+    replace (1 - 0) with 1 in Hm by ring.
+    exact Hm. }
+  pose proof (Hscal_proto Hinner) as Hscal.
+  simpl in Hscal.
+  replace (T * 1) with T in Hscal by ring.
+  exact Hscal.
+Qed.
+
+(* The improper integral statement: as b -> +infty,
+   RInt (fun E => exp(-E/T)) 0 b -> T. *)
+Theorem RInt_exp_thermal_half_line :
+  forall T, 0 < T ->
+    is_lim (fun b : R => RInt (fun E : R => exp (- E / T)) 0 b) p_infty T.
+Proof.
+  intros T HT.
+  apply (is_lim_ext_loc (fun b : R => T * (1 - exp (- b / T)))).
+  - exists 0. intros b Hb.
+    symmetry. apply RInt_exp_thermal; [exact HT | lra].
+  - apply T_times_1_minus_exp_lim. exact HT.
+Qed.
+
+(* ================================================================== *)
 (* === Maxwellian-averaged reactivity === *)
 (* ================================================================== *)
 

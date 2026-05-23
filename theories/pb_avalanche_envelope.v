@@ -230,6 +230,90 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Magnetic-field-threaded ITER witness (item 8) === *)
+(* ================================================================== *)
+
+(* Until now, the witness states in pb_avalanche.v have B_T set to a
+   positive constant (1 Tesla) which is consumed only by the
+   PlasmaState positivity requirement and not by the kinematic bound.
+   The kinetic framework's tau_eff_B machinery (tau_eff_B tau_slow
+   kappa B) lets the magnetic field appear in the effective residence
+   time via the harmonic combination 1/tau_eff = 1/tau_slow +
+   1/tau_confine, where tau_confine ∝ B². Stronger B → longer
+   residence, but capped by the slowing-down ceiling. Here we exhibit a
+   concrete ITER-class witness at B = 5 T, kappa = 1 (a kinematic
+   coupling constant), and tau_slow = 1 s (Hora-generous), and show the
+   resulting multiplication factor lies below 1. *)
+
+Definition iter_B : R := 5.        (* ITER-class field strength, Tesla. *)
+Definition iter_kappa : R := 1.    (* Kinematic coupling. *)
+Definition iter_tau_slow : R := 1. (* Hora-generous slowing-down time. *)
+Definition iter_n_B : R := 100000000000000. (* 10^14 cm^-3. *)
+
+Lemma iter_B_pos : 0 < iter_B.
+Proof. unfold iter_B. lra. Qed.
+
+Lemma iter_kappa_pos : 0 < iter_kappa.
+Proof. unfold iter_kappa. lra. Qed.
+
+Lemma iter_tau_slow_pos : 0 < iter_tau_slow.
+Proof. unfold iter_tau_slow. lra. Qed.
+
+Lemma iter_n_B_pos : 0 < iter_n_B.
+Proof. unfold iter_n_B. lra. Qed.
+
+(* The composite kinematic product (with tau_slow as the upper-bound
+   residence time, in place of the harmonically-combined tau_eff_B) is
+   strictly subcritical at the ITER-class parameters. *)
+Lemma iter_product_subcritical :
+  3 * iter_tau_slow * iter_n_B * PK.L_kin *
+    (PhysicalKineticParams.sigma_E_max * PhysicalKineticParams.v_E_max) < 1.
+Proof.
+  unfold iter_tau_slow, iter_n_B.
+  rewrite PK_sigma_v_value.
+  pose proof PK_L_lt_1 as HL1.
+  pose proof PK_L_pos as HLpos.
+  nra.
+Qed.
+
+(* The ITER-class witness theorem: at B = 5 T, with the effective
+   residence time taken as the harmonic combination of the
+   slowing-down time and the field-dependent confinement time, the
+   multiplication factor stays strictly below 1. This is the
+   field-threaded counterpart to hora_regime_no_avalanche. *)
+Theorem iter_witness_no_avalanche :
+  forall R_prim, 0 < R_prim ->
+    PK.R_secondary_kinetic iter_n_B (3 * R_prim)
+                           (PK.tau_eff_B iter_tau_slow iter_kappa iter_B)
+      / R_prim < 1.
+Proof.
+  intros R_prim HR.
+  apply PK.B_field_no_avalanche.
+  - exact HR.
+  - exact iter_n_B_pos.
+  - exact iter_tau_slow_pos.
+  - exact iter_kappa_pos.
+  - exact iter_B_pos.
+  - exact iter_product_subcritical.
+Qed.
+
+(* Monotonicity in B at the witness parameters: doubling the field
+   strength from 5 T to 10 T can only increase the effective
+   residence time, hence the multiplication factor remains bounded. *)
+Theorem iter_witness_monotone_in_B :
+  forall B1 B2, 0 < B1 -> B1 <= B2 ->
+    PK.tau_eff_B iter_tau_slow iter_kappa B1 <=
+    PK.tau_eff_B iter_tau_slow iter_kappa B2.
+Proof.
+  intros B1 B2 HB1 HB12.
+  apply PK.residence_monotone_in_B.
+  - exact iter_tau_slow_pos.
+  - exact iter_kappa_pos.
+  - exact HB1.
+  - exact HB12.
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
@@ -237,3 +321,5 @@ Print Assumptions envelope_subcritical.
 Print Assumptions hora_regime_no_avalanche.
 Print Assumptions admissible_product_subcritical.
 Print Assumptions PK_L_lt_1.
+Print Assumptions iter_witness_no_avalanche.
+Print Assumptions iter_witness_monotone_in_B.

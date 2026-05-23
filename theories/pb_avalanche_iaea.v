@@ -233,6 +233,52 @@ Fixpoint interp_linear (T : iaea_table) (E : R) : R :=
       interp_linear rest E
   end.
 
+(* === Zero-extended piecewise-linear interpolant ===
+
+   Returns 0 outside [head_E T, last_E T]; coincides with interp_linear
+   on the interval. Physically correct extrapolation for cross sections
+   that are 0 outside the resonance window. *)
+Definition interp_linear_ext (T : iaea_table) (E : R) : R :=
+  match T with
+  | [] => 0
+  | _ =>
+    if Rlt_dec E (head_E T) then 0
+    else if Rlt_dec (last_E T) E then 0
+    else interp_linear T E
+  end.
+
+Lemma interp_linear_ext_below :
+  forall T E, E < head_E T -> interp_linear_ext T E = 0.
+Proof.
+  intros T E HE.
+  destruct T as [| [e1 v1] rest]; [reflexivity |].
+  unfold interp_linear_ext.
+  destruct (Rlt_dec _ _) as [Hlt | Hge]; [reflexivity | exfalso; lra].
+Qed.
+
+Lemma interp_linear_ext_above :
+  forall T E, last_E T < E -> interp_linear_ext T E = 0.
+Proof.
+  intros T E HE.
+  destruct T as [| [e1 v1] rest]; [reflexivity |].
+  unfold interp_linear_ext.
+  destruct (Rlt_dec _ _) as [Hlt | Hge]; [reflexivity |].
+  destruct (Rlt_dec _ _) as [Hlt' | Hge']; [reflexivity | exfalso; lra].
+Qed.
+
+Lemma interp_linear_ext_inside :
+  forall T E,
+    head_E T <= E <= last_E T ->
+    interp_linear_ext T E = interp_linear T E.
+Proof.
+  intros T E [HE1 HE2].
+  destruct T as [| [e1 v1] rest].
+  - simpl in HE1. reflexivity.
+  - unfold interp_linear_ext.
+    destruct (Rlt_dec _ _) as [Hlt | Hge]; [exfalso; lra |].
+    destruct (Rlt_dec _ _) as [Hlt' | Hge']; [exfalso; lra | reflexivity].
+Qed.
+
 (* === Trapezoidal sum === *)
 Fixpoint trap_integral (T : iaea_table) : R :=
   match T with
@@ -556,6 +602,180 @@ Proof.
       pose proof (RInt_interp_linear_split e1 v1 e2 v2 rest' Hgap Hsort_full) as Hsplit.
       simpl in *. rewrite Hsplit. f_equal.
       apply IH. exact Hsort_full.
+Qed.
+
+(* === Integrability and value of the zero-extended interpolant === *)
+
+Lemma ex_RInt_interp_linear_ext :
+  forall T, sorted_table T ->
+    ex_RInt (interp_linear_ext T) (head_E T) (last_E T).
+Proof.
+  intros T Hsort.
+  apply ex_RInt_ext with (f := interp_linear T).
+  - intros x Hx.
+    rewrite Rmin_left in Hx by (apply head_E_le_last_E; exact Hsort).
+    rewrite Rmax_right in Hx by (apply head_E_le_last_E; exact Hsort).
+    symmetry. apply interp_linear_ext_inside. lra.
+  - apply ex_RInt_interp_linear. exact Hsort.
+Qed.
+
+Theorem RInt_interp_linear_ext_eq_trap :
+  forall T, sorted_table T ->
+    RInt (interp_linear_ext T) (head_E T) (last_E T) = trap_integral T.
+Proof.
+  intros T Hsort.
+  transitivity (RInt (interp_linear T) (head_E T) (last_E T)).
+  - apply (@RInt_ext R_CompleteNormedModule).
+    intros x Hx.
+    rewrite Rmin_left in Hx by (apply head_E_le_last_E; exact Hsort).
+    rewrite Rmax_right in Hx by (apply head_E_le_last_E; exact Hsort).
+    apply interp_linear_ext_inside. lra.
+  - apply RInt_interp_linear_eq_trap. exact Hsort.
+Qed.
+
+(* ================================================================== *)
+(* === Curvature-bounded interpolation error per segment ===
+   For sigma in C^2 on [a, b], the linear interpolant
+   interp_segment a (sigma a) b (sigma b) approximates sigma with error
+   bounded by the supremum of |sigma''| times (b-a)^2. The canonical
+   tight constant is 1/8 (from the Rolle's-theorem-twice argument), but
+   the proof below — using three applications of Coquelicot's MVT_gen —
+   gives the weaker constant 1. Either form establishes the same
+   O((b-a)^2) curvature scaling, which is the content of the bound.
+   The /8 sharpening is left for a future iteration that bridges
+   is_derive into Stdlib's Rolle. *)
+(* ================================================================== *)
+
+Theorem interp_segment_curvature_error :
+  forall (sigma : R -> R) (a b M2 : R),
+    a < b ->
+    0 <= M2 ->
+    (forall x, a <= x <= b -> is_derive sigma x (Derive sigma x)) ->
+    (forall x, a <= x <= b -> is_derive (Derive sigma) x
+                                        (Derive (Derive sigma) x)) ->
+    (forall x, a <= x <= b -> continuous sigma x) ->
+    (forall x, a <= x <= b -> continuous (Derive sigma) x) ->
+    (forall x, a <= x <= b -> Rabs (Derive (Derive sigma) x) <= M2) ->
+    forall t, a <= t <= b ->
+      Rabs (sigma t - interp_segment a (sigma a) b (sigma b) t) <=
+        M2 * (b - a) * (b - a).
+Proof.
+  intros sigma a b M2 Hab HM2 Hsig_d Hsig_dd Hsig_c Hsig_d_c Hsig_dd_bnd t Ht.
+  destruct (Rle_lt_dec t a) as [Htla | Htga].
+  - (* t = a *)
+    assert (Hteq : t = a) by lra. rewrite Hteq.
+    rewrite (interp_segment_left a (sigma a) b (sigma b) Hab).
+    replace (sigma a - sigma a) with 0 by ring.
+    rewrite Rabs_R0.
+    repeat apply Rmult_le_pos; lra.
+  - destruct (Rle_lt_dec b t) as [Htgb | Htlb].
+    + (* t = b *)
+      assert (Hteq : t = b) by lra. rewrite Hteq.
+      rewrite (interp_segment_right a (sigma a) b (sigma b) Hab).
+      replace (sigma b - sigma b) with 0 by ring.
+      rewrite Rabs_R0.
+      repeat apply Rmult_le_pos; lra.
+    + (* a < t < b *)
+      assert (Hat : a < t) by exact Htga.
+      assert (Htb : t < b) by exact Htlb.
+      (* Step 1: MVT on sigma on [a, b]: ∃ c ∈ (a, b),
+         sigma(b) - sigma(a) = sigma'(c) * (b - a). *)
+      destruct (MVT_gen sigma a b (Derive sigma)) as [c [Hc Heqc]].
+      { intros x Hx. rewrite Rmin_left in Hx by lra.
+        rewrite Rmax_right in Hx by lra. apply Hsig_d. lra. }
+      { intros x Hx. rewrite Rmin_left in Hx by lra.
+        rewrite Rmax_right in Hx by lra.
+        apply continuity_pt_filterlim. apply Hsig_c. lra. }
+      rewrite Rmin_left in Hc by lra. rewrite Rmax_right in Hc by lra.
+      (* Step 2: MVT on sigma on [a, t]: ∃ α ∈ (a, t),
+         sigma(t) - sigma(a) = sigma'(α) * (t - a). *)
+      destruct (MVT_gen sigma a t (Derive sigma)) as [alpha [Halpha Heqalpha]].
+      { intros x Hx. rewrite Rmin_left in Hx by lra.
+        rewrite Rmax_right in Hx by lra. apply Hsig_d. lra. }
+      { intros x Hx. rewrite Rmin_left in Hx by lra.
+        rewrite Rmax_right in Hx by lra.
+        apply continuity_pt_filterlim. apply Hsig_c. lra. }
+      rewrite Rmin_left in Halpha by lra. rewrite Rmax_right in Halpha by lra.
+      (* Compute sigma(t) - L(t):
+         L(t) = sigma(a) + secant * (t - a)
+              = sigma(a) + sigma'(c) * (t - a)  [from Step 1]
+         sigma(t) = sigma(a) + sigma'(alpha) * (t - a)  [from Step 2]
+         => sigma(t) - L(t) = (sigma'(alpha) - sigma'(c)) * (t - a). *)
+      assert (Hdiff :
+        sigma t - interp_segment a (sigma a) b (sigma b) t =
+        (Derive sigma alpha - Derive sigma c) * (t - a)).
+      { unfold interp_segment.
+        assert (Hslope : (sigma b - sigma a) / (b - a) = Derive sigma c)
+          by (field_simplify; [rewrite Heqc; field; lra | lra]).
+        assert (Hsigt : sigma t - sigma a = Derive sigma alpha * (t - a))
+          by (rewrite Heqalpha; ring).
+        nra. }
+      rewrite Hdiff.
+      (* Step 3: MVT on sigma' on the interval containing alpha and c.
+         For Derive(Derive sigma) bounded by M2,
+         |sigma'(alpha) - sigma'(c)| ≤ M2 * |alpha - c|. *)
+      assert (Halpha_in_ab : a <= alpha <= b) by lra.
+      assert (Hc_in_ab : a <= c <= b) by lra.
+      assert (Hbound_diff :
+        Rabs (Derive sigma alpha - Derive sigma c) <= M2 * (b - a)).
+      { destruct (Rle_lt_dec alpha c) as [Hac | Hac].
+        - (* alpha <= c *)
+          destruct (Req_dec alpha c) as [Heq | Hne].
+          + rewrite Heq. replace (Derive sigma c - Derive sigma c) with 0 by ring.
+            rewrite Rabs_R0.
+            apply Rmult_le_pos; lra.
+          + assert (Halt_lt_c : alpha < c) by lra.
+            destruct (MVT_gen (Derive sigma) alpha c (Derive (Derive sigma)))
+              as [eta [Heta Heqeta]].
+            { intros x Hx. rewrite Rmin_left in Hx by lra.
+              rewrite Rmax_right in Hx by lra.
+              apply Hsig_dd. lra. }
+            { intros x Hx. rewrite Rmin_left in Hx by lra.
+              rewrite Rmax_right in Hx by lra.
+              apply continuity_pt_filterlim. apply Hsig_d_c. lra. }
+            rewrite Rmin_left in Heta by lra.
+            rewrite Rmax_right in Heta by lra.
+            (* Heqeta : Derive sigma c - Derive sigma alpha =
+                        Derive (Derive sigma) eta * (c - alpha) *)
+            rewrite <- Rabs_Ropp.
+            replace (- (Derive sigma alpha - Derive sigma c))
+              with (Derive sigma c - Derive sigma alpha) by ring.
+            rewrite Heqeta.
+            rewrite Rabs_mult.
+            rewrite (Rabs_right (c - alpha)) by lra.
+            apply Rle_trans with (M2 * (c - alpha)).
+            * apply Rmult_le_compat_r; [lra |].
+              apply Hsig_dd_bnd. lra.
+            * apply Rmult_le_compat_l; [exact HM2 | lra].
+        - (* c < alpha *)
+          assert (Hc_lt_alpha : c < alpha) by lra.
+          destruct (MVT_gen (Derive sigma) c alpha (Derive (Derive sigma)))
+            as [eta [Heta Heqeta]].
+          { intros x Hx. rewrite Rmin_left in Hx by lra.
+            rewrite Rmax_right in Hx by lra.
+            apply Hsig_dd. lra. }
+          { intros x Hx. rewrite Rmin_left in Hx by lra.
+            rewrite Rmax_right in Hx by lra.
+            apply continuity_pt_filterlim. apply Hsig_d_c. lra. }
+          rewrite Rmin_left in Heta by lra.
+          rewrite Rmax_right in Heta by lra.
+          assert (HsignDiff :
+            Rabs (Derive sigma alpha - Derive sigma c) =
+            Rabs (Derive (Derive sigma) eta) * (alpha - c)).
+          { rewrite Heqeta. rewrite Rabs_mult.
+            rewrite (Rabs_right (alpha - c)) by lra. reflexivity. }
+          rewrite HsignDiff.
+          apply Rle_trans with (M2 * (alpha - c)).
+          + apply Rmult_le_compat_r; [lra |].
+            apply Hsig_dd_bnd. lra.
+          + apply Rmult_le_compat_l; [exact HM2 | lra]. }
+      rewrite Rabs_mult.
+      rewrite (Rabs_right (t - a)) by lra.
+      apply Rle_trans with (M2 * (b - a) * (t - a)).
+      * apply Rmult_le_compat_r; [lra | exact Hbound_diff].
+      * apply Rmult_le_compat_l.
+        -- apply Rmult_le_pos; lra.
+        -- lra.
 Qed.
 
 (* ================================================================== *)
