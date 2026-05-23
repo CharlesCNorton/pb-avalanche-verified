@@ -377,6 +377,111 @@ Module KineticFramework (K : KINETIC_MODEL_PARAMS).
   Qed.
 
   (* ================================================================ *)
+  (* === Substantive factorization (item 1) === *)
+  (* ================================================================ *)
+
+  (* The logarithmic kinematic factor of the slowing-down spectrum:
+     L = ln(E_birth) - ln(E_min) = ln(E_birth / E_min). It measures the
+     energy span over which the 1/E spectrum spreads the alphas, and
+     enters the alpha density n_alpha = S * tau * L. *)
+  Definition L_kin : R := ln E_alpha_birth_MeV - ln E_min.
+
+  Lemma L_kin_pos : 0 < L_kin.
+  Proof. unfold L_kin. exact ln_diff_pos. Qed.
+
+  (* Source rate convention: each p+11B reaction yields 3 alphas, so the
+     alpha birth rate is 3 * R_primary. Substituting S = 3 * R_primary
+     into the kinetic collision integral and factoring yields the
+     bilinear decomposition
+
+       R_secondary = 3 * R_primary * tau * n_B * (L * <sigma v>_kinetic)
+
+     where the bracketed quantity is the effective velocity integral,
+     the alpha-spectrum-averaged sigma*v scaled by the kinematic factor.
+     This is the substantive content behind
+     multiplication_factor_equals_figure_of_merit: the bilinear form is
+     not assumed but derived from the energy-resolved Fokker-Planck
+     collision integral. *)
+  Theorem R_secondary_bilinear_factorization :
+    forall R_prim n_B tau,
+      0 < R_prim -> 0 < tau ->
+      R_secondary_kinetic n_B (3 * R_prim) tau =
+      3 * R_prim * tau * n_B * (L_kin * sigma_v_kinetic (3 * R_prim) tau).
+  Proof.
+    intros R_prim n_B tau HR Htau.
+    assert (HS : 0 < 3 * R_prim) by lra.
+    rewrite (R_secondary_kinetic_factorization n_B (3 * R_prim) tau HS Htau).
+    rewrite n_alpha_kinetic_value.
+    unfold L_kin. ring.
+  Qed.
+
+  (* The energy-resolved figure of merit. *)
+  Definition kinetic_figure_of_merit (R_prim n_B tau : R) : R :=
+    3 * tau * n_B * (L_kin * sigma_v_kinetic (3 * R_prim) tau).
+
+  (* Substantive multiplication_factor_equals_figure_of_merit: the
+     secondary-to-primary ratio equals the bilinear figure of merit,
+     derived from the collision integral rather than by definitional
+     unfolding. *)
+  Theorem multiplication_factor_kinetic_eq_FoM :
+    forall R_prim n_B tau,
+      0 < R_prim -> 0 < tau ->
+      R_secondary_kinetic n_B (3 * R_prim) tau / R_prim =
+      kinetic_figure_of_merit R_prim n_B tau.
+  Proof.
+    intros R_prim n_B tau HR Htau.
+    rewrite (R_secondary_bilinear_factorization R_prim n_B tau HR Htau).
+    unfold kinetic_figure_of_merit.
+    field. apply Rgt_not_eq. exact HR.
+  Qed.
+
+  (* ================================================================ *)
+  (* === Energy-resolved subcriticality bound (item 2) === *)
+  (* ================================================================ *)
+
+  (* The figure of merit is bounded by the product of the kinematic
+     factor, the densities, the slowing-down time, and the
+     cross-section/velocity maxima. Subcriticality of this product
+     gives M < 1. *)
+  Theorem kinetic_FoM_upper_bound :
+    forall R_prim n_B tau,
+      0 < R_prim -> 0 < n_B -> 0 < tau ->
+      kinetic_figure_of_merit R_prim n_B tau <=
+      3 * tau * n_B * L_kin * (sigma_E_max * v_E_max).
+  Proof.
+    intros R_prim n_B tau HR HnB Htau.
+    unfold kinetic_figure_of_merit.
+    assert (HS : 0 < 3 * R_prim) by lra.
+    pose proof (sigma_v_kinetic_bound (3 * R_prim) tau HS Htau) as Hsv.
+    pose proof L_kin_pos as HL.
+    pose proof sigma_E_max_pos as Hsig.
+    pose proof v_E_max_pos as Hv.
+    (* 3 tau n_B (L * sv) <= 3 tau n_B L (sigma_max v_max) *)
+    apply Rle_trans with
+      (3 * tau * n_B * (L_kin * (sigma_E_max * v_E_max))).
+    - apply Rmult_le_compat_l.
+      + repeat apply Rmult_le_pos; lra.
+      + apply Rmult_le_compat_l; [lra | exact Hsv].
+    - apply Req_le. ring.
+  Qed.
+
+  (* If the bounding product is below 1, the multiplication factor is
+     strictly below 1: no avalanche. *)
+  Theorem kinetic_no_avalanche :
+    forall R_prim n_B tau,
+      0 < R_prim -> 0 < n_B -> 0 < tau ->
+      3 * tau * n_B * L_kin * (sigma_E_max * v_E_max) < 1 ->
+      R_secondary_kinetic n_B (3 * R_prim) tau / R_prim < 1.
+  Proof.
+    intros R_prim n_B tau HR HnB Htau Hsub.
+    rewrite (multiplication_factor_kinetic_eq_FoM R_prim n_B tau HR Htau).
+    apply Rle_lt_trans with
+      (3 * tau * n_B * L_kin * (sigma_E_max * v_E_max)).
+    - exact (kinetic_FoM_upper_bound R_prim n_B tau HR HnB Htau).
+    - exact Hsub.
+  Qed.
+
+  (* ================================================================ *)
   (* === Fokker-Planck steady state === *)
   (* ================================================================ *)
 
@@ -541,3 +646,7 @@ Print Assumptions ConstantKineticFramework.RInt_f_slowing.
 Print Assumptions ConstantKineticFramework.slowing_down_steady_state.
 Print Assumptions ConstantKineticFramework.source_equals_sink.
 Print Assumptions ConstantKineticFramework.slowing_flux_steady_derivative.
+Print Assumptions ConstantKineticFramework.R_secondary_bilinear_factorization.
+Print Assumptions ConstantKineticFramework.multiplication_factor_kinetic_eq_FoM.
+Print Assumptions ConstantKineticFramework.kinetic_FoM_upper_bound.
+Print Assumptions ConstantKineticFramework.kinetic_no_avalanche.
