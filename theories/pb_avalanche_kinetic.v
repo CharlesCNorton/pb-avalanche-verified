@@ -76,6 +76,18 @@ Module Type KINETIC_MODEL_PARAMS.
   Axiom v_E_bound :
     forall E, E_min <= E <= E_alpha_birth_MeV -> v_E E <= v_E_max.
 
+  (* Lower bounds, for the two-sided sandwich on the figure of merit. *)
+  Parameter sigma_E_min_val : R.
+  Parameter v_E_min_val : R.
+
+  Axiom sigma_E_min_nonneg : 0 <= sigma_E_min_val.
+  Axiom v_E_min_nonneg : 0 <= v_E_min_val.
+
+  Axiom sigma_E_lower :
+    forall E, E_min <= E <= E_alpha_birth_MeV -> sigma_E_min_val <= sigma_E E.
+  Axiom v_E_lower :
+    forall E, E_min <= E <= E_alpha_birth_MeV -> v_E_min_val <= v_E E.
+
   Axiom sigma_E_continuous_on :
     forall E, E_min <= E <= E_alpha_birth_MeV -> continuous sigma_E E.
   Axiom v_E_continuous_on :
@@ -324,6 +336,80 @@ Module KineticFramework (K : KINETIC_MODEL_PARAMS).
       rewrite Hsimpl. apply Rle_refl.
   Qed.
 
+  (* --- Lower bound on the velocity-weighted integral --- *)
+
+  Lemma f_slowing_sigma_v_lower :
+    forall S tau E,
+      0 <= S -> 0 <= tau -> E_min <= E <= E_alpha_birth_MeV ->
+      f_slowing S tau E * (sigma_E_min_val * v_E_min_val) <=
+      f_slowing S tau E * (sigma_E E * v_E E).
+  Proof.
+    intros S tau E HS Htau HE.
+    apply Rmult_le_compat_l.
+    - apply f_slowing_nonneg; [exact HS | exact Htau |].
+      destruct HE. assumption.
+    - apply Rmult_le_compat.
+      + exact sigma_E_min_nonneg.
+      + exact v_E_min_nonneg.
+      + apply sigma_E_lower. exact HE.
+      + apply v_E_lower. exact HE.
+  Qed.
+
+  Lemma RInt_fsv_ge_min :
+    forall S tau,
+      0 <= S -> 0 <= tau ->
+      (sigma_E_min_val * v_E_min_val) * n_alpha_kinetic S tau <=
+      RInt (fun E => f_slowing S tau E * (sigma_E E * v_E E))
+           E_min E_alpha_birth_MeV.
+  Proof.
+    intros S tau HS Htau.
+    pose proof E_min_lt_birth as HltE.
+    assert (Hex_f : ex_RInt (f_slowing S tau) E_min E_alpha_birth_MeV)
+      by apply ex_RInt_f_slowing.
+    assert (Hex_scaled : ex_RInt
+      (fun E : R => (sigma_E_min_val * v_E_min_val) * f_slowing S tau E)
+      E_min E_alpha_birth_MeV)
+      by (apply ex_RInt_scal_R; exact Hex_f).
+    assert (Hscal_eq :
+      (sigma_E_min_val * v_E_min_val) * n_alpha_kinetic S tau =
+      RInt (fun E : R => (sigma_E_min_val * v_E_min_val) * f_slowing S tau E)
+           E_min E_alpha_birth_MeV).
+    { unfold n_alpha_kinetic.
+      symmetry. apply RInt_scal_R. exact Hex_f. }
+    rewrite Hscal_eq.
+    apply RInt_le.
+    - apply Rlt_le. exact HltE.
+    - exact Hex_scaled.
+    - apply ex_RInt_f_sigma_v.
+    - intros E [HE1 HE2].
+      rewrite (Rmult_comm (sigma_E_min_val * v_E_min_val)
+                          (f_slowing S tau E)).
+      apply f_slowing_sigma_v_lower; [exact HS | exact Htau |].
+      split; lra.
+  Qed.
+
+  Theorem sigma_v_kinetic_lower_bound :
+    forall S tau, 0 < S -> 0 < tau ->
+      sigma_E_min_val * v_E_min_val <= sigma_v_kinetic S tau.
+  Proof.
+    intros S tau HS Htau.
+    unfold sigma_v_kinetic.
+    pose proof (n_alpha_kinetic_pos S tau HS Htau) as Hn_pos.
+    pose proof (RInt_fsv_ge_min S tau (Rlt_le _ _ HS) (Rlt_le _ _ Htau))
+      as Hint_ge.
+    apply Rle_trans with
+      ((sigma_E_min_val * v_E_min_val) * n_alpha_kinetic S tau /
+       n_alpha_kinetic S tau).
+    - assert (Hsimpl :
+        (sigma_E_min_val * v_E_min_val) * n_alpha_kinetic S tau /
+          n_alpha_kinetic S tau = sigma_E_min_val * v_E_min_val).
+      { field. apply Rgt_not_eq. exact Hn_pos. }
+      rewrite Hsimpl. apply Rle_refl.
+    - unfold Rdiv. apply Rmult_le_compat_r.
+      + apply Rlt_le. apply Rinv_0_lt_compat. exact Hn_pos.
+      + exact Hint_ge.
+  Qed.
+
   (* --- Kinetic R_secondary: literal collision integral --- *)
 
   Definition R_secondary_kinetic (n_B S tau : R) : R :=
@@ -464,6 +550,53 @@ Module KineticFramework (K : KINETIC_MODEL_PARAMS).
       + apply Rmult_le_compat_l; [lra | exact Hsv].
     - apply Req_le. ring.
   Qed.
+
+  (* Matching lower bound on the figure of merit (item 13). *)
+  Theorem kinetic_FoM_lower_bound :
+    forall R_prim n_B tau,
+      0 < R_prim -> 0 < n_B -> 0 < tau ->
+      3 * tau * n_B * L_kin * (sigma_E_min_val * v_E_min_val) <=
+      kinetic_figure_of_merit R_prim n_B tau.
+  Proof.
+    intros R_prim n_B tau HR HnB Htau.
+    unfold kinetic_figure_of_merit.
+    assert (HS : 0 < 3 * R_prim) by lra.
+    pose proof (sigma_v_kinetic_lower_bound (3 * R_prim) tau HS Htau) as Hsv.
+    pose proof L_kin_pos as HL.
+    apply Rle_trans with
+      (3 * tau * n_B * (L_kin * (sigma_E_min_val * v_E_min_val))).
+    - apply Req_le. ring.
+    - apply Rmult_le_compat_l.
+      + repeat apply Rmult_le_pos; lra.
+      + apply Rmult_le_compat_l; [lra | exact Hsv].
+  Qed.
+
+  (* Two-sided sandwich: the figure of merit lies between the lower and
+     upper kinematic products. The gap between them is controlled by the
+     spread between the cross-section/velocity minima and maxima. *)
+  Theorem kinetic_FoM_sandwich :
+    forall R_prim n_B tau,
+      0 < R_prim -> 0 < n_B -> 0 < tau ->
+      3 * tau * n_B * L_kin * (sigma_E_min_val * v_E_min_val) <=
+      kinetic_figure_of_merit R_prim n_B tau <=
+      3 * tau * n_B * L_kin * (sigma_E_max * v_E_max).
+  Proof.
+    intros R_prim n_B tau HR HnB Htau.
+    split.
+    - exact (kinetic_FoM_lower_bound R_prim n_B tau HR HnB Htau).
+    - exact (kinetic_FoM_upper_bound R_prim n_B tau HR HnB Htau).
+  Qed.
+
+  (* The gap between the upper and lower bounds is exactly
+     3*tau*n_B*L*(sigma_max*v_max - sigma_min*v_min), an explicit
+     closed form controlling the margin from both sides. *)
+  Theorem kinetic_FoM_gap :
+    forall n_B tau : R,
+      3 * tau * n_B * L_kin * (sigma_E_max * v_E_max) -
+      3 * tau * n_B * L_kin * (sigma_E_min_val * v_E_min_val) =
+      3 * tau * n_B * L_kin *
+        (sigma_E_max * v_E_max - sigma_E_min_val * v_E_min_val).
+  Proof. intros. ring. Qed.
 
   (* If the bounding product is below 1, the multiplication factor is
      strictly below 1: no avalanche. *)
@@ -625,6 +758,23 @@ Module ConstantKineticParams <: KINETIC_MODEL_PARAMS.
   Lemma v_E_bound :
     forall E, E_min <= E <= E_alpha_birth_MeV -> v_E E <= v_E_max.
   Proof. intros. unfold v_E. apply Rle_refl. Qed.
+
+  Definition sigma_E_min_val : R := sigma_E_max.
+  Definition v_E_min_val : R := v_E_max.
+
+  Lemma sigma_E_min_nonneg : 0 <= sigma_E_min_val.
+  Proof. unfold sigma_E_min_val. apply Rlt_le. exact sigma_E_max_pos. Qed.
+
+  Lemma v_E_min_nonneg : 0 <= v_E_min_val.
+  Proof. unfold v_E_min_val. apply Rlt_le. exact v_E_max_pos. Qed.
+
+  Lemma sigma_E_lower :
+    forall E, E_min <= E <= E_alpha_birth_MeV -> sigma_E_min_val <= sigma_E E.
+  Proof. intros. unfold sigma_E_min_val, sigma_E. apply Rle_refl. Qed.
+
+  Lemma v_E_lower :
+    forall E, E_min <= E <= E_alpha_birth_MeV -> v_E_min_val <= v_E E.
+  Proof. intros. unfold v_E_min_val, v_E. apply Rle_refl. Qed.
 
   Lemma sigma_E_continuous_on :
     forall E, E_min <= E <= E_alpha_birth_MeV -> continuous sigma_E E.
