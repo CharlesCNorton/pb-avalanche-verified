@@ -388,3 +388,60 @@ Proof.
 Qed.
 
 Print Assumptions all_settlements_subcritical.
+
+(* ================================================================== *)
+(* === Polynomial integration: RInt of the identity === *)
+(* ================================================================== *)
+
+(* Closed-form integral RInt (fun x => x) 0 b = b*b/2, derived via
+   Coquelicot's fundamental theorem of calculus (RInt_Derive) with
+   antiderivative F(x) = x*x/2. The derivative computation is built
+   from is_derive_mult (product rule for (x*x)' = 2x) plus
+   is_derive_scal_l (constant rescaling by 1/2 gives 2x*(1/2) = x). *)
+
+Lemma R_is_derive_id : forall x : R, is_derive (fun y : R => y) x 1.
+Proof. intros x. exact (@is_derive_id R_AbsRing x). Qed.
+
+Lemma id_squared_derive :
+  forall x : R, is_derive (fun y : R => y * y) x (2 * x).
+Proof.
+  intros x.
+  replace (2 * x) with (1 * x + x * 1) by ring.
+  apply (Derive.is_derive_mult (fun y : R => y) (fun y : R => y) x 1 1).
+  - apply R_is_derive_id.
+  - apply R_is_derive_id.
+Qed.
+
+Lemma F_quadratic_derive :
+  forall x : R, is_derive (fun y : R => y * y / 2) x x.
+Proof.
+  intros x. unfold Rdiv.
+  replace x with (2 * x * / 2) at 2 by field.
+  apply (is_derive_scal_l (fun y : R => y * y) x (2 * x) (/ 2)).
+  apply id_squared_derive.
+Qed.
+
+Lemma RInt_id_0_b :
+  forall b : R, 0 <= b -> RInt (fun x : R => x) 0 b = b * b / 2.
+Proof.
+  intros b Hb.
+  set (F := fun y : R => y * y / 2).
+  assert (HFid : forall x : R, is_derive F x x).
+  { intros x. unfold F. apply F_quadratic_derive. }
+  assert (HF_ex : forall x : R, ex_derive F x).
+  { intros x. exists x. apply HFid. }
+  assert (HF_eq : forall x : R, Derive F x = x).
+  { intros x. apply is_derive_unique. apply HFid. }
+  transitivity (RInt (Derive F) 0 b).
+  - apply RInt_ext. intros x _. symmetry. apply HF_eq.
+  - assert (HRintD : RInt (Derive F) 0 b = F b - F 0).
+    { apply RInt_Derive.
+      - intros x _. apply HF_ex.
+      - intros x _. apply continuous_ext with (fun y : R => y).
+        + intros y. symmetry. apply HF_eq.
+        + apply continuous_id. }
+    rewrite HRintD. unfold F. simpl.
+    unfold Rdiv. rewrite Rmult_0_l, Rmult_0_l, Rminus_0_r. reflexivity.
+Qed.
+
+Print Assumptions RInt_id_0_b.
