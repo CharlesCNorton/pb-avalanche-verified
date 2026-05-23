@@ -98,6 +98,34 @@ two custom bridge lemmas `ex_RInt_scal_R` and `RInt_scal_R` that
 discharge the typeclass mismatch between Coquelicot's polymorphic
 `scal` over normed modules and Stdlib's `Rmult`.
 
+## Quantitative bounds
+
+The composite figure-of-merit upper bound evaluates to explicit
+rationals in each concrete instantiation:
+
+| Instantiation | `FoM_max_reactor` | Safety margin |
+|---|---|---|
+| `ConcreteSettlement`  | `3 / 100`                | `M(s) <= 3/100`, so `1 - M(s) >= 97/100` |
+| `PhysicalSettlement`  | `3 / 10^13`              | `M(s) <= 10^-12` |
+| `SaturatedSettlement` | `3 / 100`                | `M(s) <= 3/100` |
+| `IntegralSettlement`  | `3 / 100`                | `M(s) <= 3/100` |
+
+For the physical-scale instantiation the multiplication factor stays
+at least thirteen orders of magnitude below the avalanche threshold
+throughout the regime, proved as `physical_safety_margin`.
+
+The contrapositive `reactor_avalanche_impossible` makes the no-go
+content explicit: any plasma state with `multiplication_factor >= 1`
+must violate the reactor regime, so any putatively avalanching
+configuration is necessarily outside the parameter envelope under
+which the analysis applies.
+
+The meta-theorem `all_settlements_subcritical` (in
+`pb_avalanche_integral.v`) bundles the four
+`reactor_no_multiplication` conclusions into a single statement
+verifying that every concrete instantiation certifies subcriticality
+throughout its regime.
+
 ## Axiom footprint
 
 Every theorem in `ConcreteSettlement`, `PhysicalSettlement`,
