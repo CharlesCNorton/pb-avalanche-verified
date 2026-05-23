@@ -445,3 +445,46 @@ Proof.
 Qed.
 
 Print Assumptions RInt_id_0_b.
+
+(* ================================================================== *)
+(* === Linear cross-section average derived via integration === *)
+(* ================================================================== *)
+
+(* The alpha-weighted average for a uniform distribution
+   f(E) = 1/E_birth and a linear cross section sigma(E) = sigma_max * E
+   / E_birth (with constant velocity v_max), evaluated as a literal
+   ratio of Coquelicot integrals using RInt_id_0_b. The closed form
+   sigma_max * v_max / 2 is the exact integral value, not asserted. *)
+
+Theorem linear_integrand_RInt :
+  forall (sigma_max v_max : R),
+    RInt (fun E : R => / E_alpha_birth_MeV *
+                       (sigma_max * E / E_alpha_birth_MeV) * v_max)
+         0 E_alpha_birth_MeV = sigma_max * v_max / 2.
+Proof.
+  intros sigma_max v_max.
+  assert (Hbirth : 0 < E_alpha_birth_MeV)
+    by (unfold E_alpha_birth_MeV, Q_pB_MeV; lra).
+  assert (Hne : E_alpha_birth_MeV <> 0) by lra.
+  set (c := sigma_max * v_max /
+            (E_alpha_birth_MeV * E_alpha_birth_MeV)).
+  assert (Hex_id : ex_RInt (fun E : R => E) 0 E_alpha_birth_MeV).
+  { apply (@ex_RInt_continuous R_CompleteNormedModule).
+    intros x _. apply continuous_id. }
+  transitivity (RInt (fun E : R => c * E) 0 E_alpha_birth_MeV).
+  - apply (@RInt_ext R_CompleteNormedModule).
+    intros E _.
+    change (/ E_alpha_birth_MeV * (sigma_max * E / E_alpha_birth_MeV) * v_max
+            = c * E).
+    unfold c. field. exact Hne.
+  - rewrite RInt_scal_R; [|exact Hex_id].
+    rewrite RInt_id_0_b by lra.
+    subst c.
+    change ((sigma_max * v_max /
+              (E_alpha_birth_MeV * E_alpha_birth_MeV)) *
+            (E_alpha_birth_MeV * E_alpha_birth_MeV / 2) =
+            sigma_max * v_max / 2).
+    field. exact Hne.
+Qed.
+
+Print Assumptions linear_integrand_RInt.
