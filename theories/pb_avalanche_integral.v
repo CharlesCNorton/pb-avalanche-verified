@@ -375,12 +375,15 @@ Theorem all_settlements_subcritical :
              PhysicalSettlement.multiplication_factor s < 1) /\
   (forall s, SaturatedSettlement.reactor_regime s ->
              SaturatedSettlement.multiplication_factor s < 1) /\
+  (forall s, LinearCrossSectionSettlement.reactor_regime s ->
+             LinearCrossSectionSettlement.multiplication_factor s < 1) /\
   (forall s, IntegralSettlement.reactor_regime s ->
              IntegralSettlement.multiplication_factor s < 1).
 Proof.
   split; [exact ConcreteSettlement.reactor_no_multiplication |].
   split; [exact PhysicalSettlement.reactor_no_multiplication |].
   split; [exact SaturatedSettlement.reactor_no_multiplication |].
+  split; [exact LinearCrossSectionSettlement.reactor_no_multiplication |].
   exact IntegralSettlement.reactor_no_multiplication.
 Qed.
 

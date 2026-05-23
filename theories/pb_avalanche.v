@@ -694,6 +694,136 @@ End ConcreteParams.
 Module ConcreteSettlement := PBAvalancheFramework ConcreteParams.
 
 (* ================================================================== *)
+(* === Linear cross section instantiation === *)
+(* ================================================================== *)
+
+(* An instantiation with a non-constant knock-on cross section
+   sigma(E) = sigma_max * E / E_birth that vanishes at E = 0 and
+   peaks at the birth energy. Under a uniform alpha distribution
+   f(E) = 1/E_birth, the closed-form alpha-weighted average is
+   sigma_max * v_max / 2, half the uniform bound. This is the
+   physically realistic regime where the knock-on cross section is
+   suppressed at low alpha energies. The alpha_weighted_integral
+   bound holds strictly: the average is strictly below the
+   pointwise maximum sigma_max * v_max. *)
+
+Module LinearCrossSectionParams <: PB_AVALANCHE_PARAMS.
+
+  Definition sigma_v_pB_thermal : R -> R := fun _ => 1.
+
+  Lemma sigma_v_pB_thermal_positive :
+    forall T, 0 < T -> 0 < sigma_v_pB_thermal T.
+  Proof. intros. unfold sigma_v_pB_thermal. lra. Qed.
+
+  Definition sigma_knockon_max : R := 1 / 10000000.
+
+  Lemma sigma_knockon_max_positive : 0 < sigma_knockon_max.
+  Proof. unfold sigma_knockon_max. lra. Qed.
+
+  Lemma E_alpha_birth_pos_lcs : 0 < E_alpha_birth_MeV.
+  Proof. unfold E_alpha_birth_MeV, Q_pB_MeV. lra. Qed.
+
+  Definition sigma_alpha_p_knockon : CrossSection :=
+    fun E => sigma_knockon_max * E / E_alpha_birth_MeV.
+
+  Lemma sigma_alpha_p_knockon_nonneg :
+    forall E, 0 <= E -> 0 <= sigma_alpha_p_knockon E.
+  Proof.
+    intros E HE. unfold sigma_alpha_p_knockon.
+    apply Rmult_le_pos.
+    - apply Rmult_le_pos.
+      + apply Rlt_le. exact sigma_knockon_max_positive.
+      + exact HE.
+    - apply Rlt_le, Rinv_0_lt_compat. exact E_alpha_birth_pos_lcs.
+  Qed.
+
+  Lemma sigma_alpha_p_knockon_uniform_bound :
+    forall E, 0 <= E <= E_alpha_birth_MeV ->
+      sigma_alpha_p_knockon E <= sigma_knockon_max.
+  Proof.
+    intros E [HE0 HE1]. unfold sigma_alpha_p_knockon.
+    pose proof E_alpha_birth_pos_lcs as Hbirth.
+    pose proof sigma_knockon_max_positive as Hsigma.
+    assert (Hbirth_ne : E_alpha_birth_MeV <> 0) by lra.
+    apply Rmult_le_reg_r with E_alpha_birth_MeV; [exact Hbirth |].
+    unfold Rdiv. rewrite Rmult_assoc, Rinv_l; [|exact Hbirth_ne].
+    rewrite Rmult_1_r.
+    apply Rmult_le_compat_l; [lra | exact HE1].
+  Qed.
+
+  Definition v_alpha_max : R := 10000.
+
+  Lemma v_alpha_max_positive : 0 < v_alpha_max.
+  Proof. unfold v_alpha_max. lra. Qed.
+
+  Definition Cspitzer : R := 1 / 100.
+
+  Lemma Cspitzer_positive : 0 < Cspitzer.
+  Proof. unfold Cspitzer. lra. Qed.
+
+  (* Closed-form alpha-weighted average under uniform f and linear sigma:
+     int_0^E_birth (1/E_birth) * (sigma_max * E / E_birth) * v_max dE
+     / int_0^E_birth (1/E_birth) dE
+     = (sigma_max * v_max / E_birth^2) * (E_birth^2 / 2) / 1
+     = sigma_max * v_max / 2. *)
+  Definition alpha_weighted_secondary_velocity_integral
+    (_ : PlasmaState) : R := sigma_knockon_max * v_alpha_max / 2.
+
+  Lemma alpha_weighted_integral_nonneg :
+    forall s, 0 <= alpha_weighted_secondary_velocity_integral s.
+  Proof.
+    intros. unfold alpha_weighted_secondary_velocity_integral,
+                  sigma_knockon_max, v_alpha_max.
+    lra.
+  Qed.
+
+  Lemma alpha_weighted_integral_uniform_bound :
+    forall s, alpha_weighted_secondary_velocity_integral s <=
+              sigma_knockon_max * v_alpha_max.
+  Proof.
+    intros. unfold alpha_weighted_secondary_velocity_integral,
+                  sigma_knockon_max, v_alpha_max.
+    lra.
+  Qed.
+
+  Definition n_B_max_reactor : R := 100.
+  Definition T_max_reactor   : R := 100.
+  Definition n_p_min_reactor : R := 100.
+
+  Lemma n_B_max_reactor_positive : 0 < n_B_max_reactor.
+  Proof. unfold n_B_max_reactor. lra. Qed.
+  Lemma T_max_reactor_positive : 0 < T_max_reactor.
+  Proof. unfold T_max_reactor. lra. Qed.
+  Lemma n_p_min_reactor_positive : 0 < n_p_min_reactor.
+  Proof. unfold n_p_min_reactor. lra. Qed.
+
+  Lemma sqrt_100_eq_10 : sqrt 100 = 10.
+  Proof.
+    apply Rsqr_inj.
+    - apply sqrt_pos.
+    - lra.
+    - rewrite Rsqr_sqrt by lra.
+      unfold Rsqr. ring.
+  Qed.
+
+  Lemma reactor_subcritical_axiom :
+    3 * n_B_max_reactor *
+    (Cspitzer * T_max_reactor * sqrt T_max_reactor / n_p_min_reactor) *
+    sigma_knockon_max * v_alpha_max < 1.
+  Proof.
+    unfold n_B_max_reactor, Cspitzer, T_max_reactor, n_p_min_reactor,
+           sigma_knockon_max, v_alpha_max.
+    rewrite sqrt_100_eq_10.
+    field_simplify.
+    lra.
+  Qed.
+
+End LinearCrossSectionParams.
+
+Module LinearCrossSectionSettlement :=
+  PBAvalancheFramework LinearCrossSectionParams.
+
+(* ================================================================== *)
 (* === Physical-scale instantiation === *)
 (* ================================================================== *)
 
