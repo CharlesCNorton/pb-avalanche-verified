@@ -1030,6 +1030,33 @@ Proof.
   exact physical_witness_in_regime.
 Qed.
 
+(* The composite FoM upper bound at physical reactor parameters
+   evaluates exactly to 3/10^13 — thirteen orders of magnitude below
+   the avalanche threshold. *)
+Lemma physical_FoM_max_value :
+  PhysicalSettlement.FoM_max_reactor = 3 / 10000000000000.
+Proof.
+  unfold PhysicalSettlement.FoM_max_reactor,
+         PhysicalSettlement.tau_max_reactor.
+  unfold PhysicalParams.Cspitzer, PhysicalParams.T_max_reactor,
+         PhysicalParams.n_p_min_reactor, PhysicalParams.n_B_max_reactor,
+         PhysicalParams.sigma_knockon_max, PhysicalParams.v_alpha_max.
+  rewrite PhysicalParams.sqrt_100_eq_10.
+  field.
+Qed.
+
+Theorem physical_multiplication_factor_bound :
+  forall (s : PlasmaState),
+    PhysicalSettlement.reactor_regime s ->
+    PhysicalSettlement.multiplication_factor s <= 3 / 10000000000000.
+Proof.
+  intros s Hr.
+  rewrite PhysicalSettlement.multiplication_factor_equals_figure_of_merit.
+  apply Rle_trans with PhysicalSettlement.FoM_max_reactor.
+  - exact (PhysicalSettlement.reactor_FoM_upper_bound s Hr).
+  - rewrite physical_FoM_max_value. apply Rle_refl.
+Qed.
+
 (* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
