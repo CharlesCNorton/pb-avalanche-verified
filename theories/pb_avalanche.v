@@ -505,6 +505,33 @@ Module PBAvalancheFramework (P : PB_AVALANCHE_PARAMS).
     exact (reactor_FoM_upper_bound s Hr).
   Qed.
 
+  (* === Constructive impossibility ===
+
+     The contrapositive of reactor_no_multiplication: any plasma state
+     in which the multiplication factor reaches the avalanche threshold
+     must violate the reactor regime. This makes the no-go conclusion
+     explicit: chain multiplication cannot occur within the regime, so
+     any putatively avalanching configuration must lie outside the
+     parameter envelope under which the analysis applies. *)
+
+  Theorem reactor_avalanche_impossible :
+    forall (s : PlasmaState),
+      1 <= multiplication_factor s -> ~ reactor_regime s.
+  Proof.
+    intros s HM Hr.
+    pose proof (reactor_no_multiplication s Hr) as HM1.
+    lra.
+  Qed.
+
+  Theorem reactor_FoM_avalanche_impossible :
+    forall (s : PlasmaState),
+      1 <= avalanche_figure_of_merit s -> ~ reactor_regime s.
+  Proof.
+    intros s HFoM Hr.
+    pose proof (reactor_no_avalanche s Hr) as HFoM1.
+    lra.
+  Qed.
+
   (* === Pointwise bound at state-specific parameters ===
 
      A sharper bound on the multiplication factor evaluated at the
