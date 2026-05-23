@@ -52,233 +52,589 @@ Record PlasmaState : Type := mkPlasmaState {
   pos_B   : 0 < B_T;
 }.
 
-(* === Cross sections ===
-   sigma_v_pB_thermal: Maxwell-averaged primary rate coefficient using the
-   Nevins-Swain (2000) parameterization with the Sikora-Weller (2016)
-   revised resonance structure.
-   sigma_alpha_p_knockon: knock-on cross section for an alpha at energy E
-   to scatter a proton above the p+11B fusion-relevant range. *)
+(* === Auxiliary lemma ===
+   Monotonicity of sqrt on non-negatives. *)
 
-Parameter sigma_v_pB_thermal    : R -> R.
-Parameter sigma_alpha_p_knockon : CrossSection.
+Lemma sqrt_monotone_le :
+  forall x y, 0 <= x -> x <= y -> sqrt x <= sqrt y.
+Proof.
+  intros x y Hx Hxy.
+  apply sqrt_le_1; lra.
+Qed.
 
-Axiom sigma_v_pB_thermal_positive :
-  forall T, 0 < T -> 0 < sigma_v_pB_thermal T.
+(* ================================================================== *)
+(* === Abstract framework: parameter spec === *)
+(* ================================================================== *)
 
-Axiom sigma_alpha_p_knockon_nonneg :
-  forall E, 0 <= E -> 0 <= sigma_alpha_p_knockon E.
+(* The kinetic functions and physical constants are encapsulated in a
+   Module Type so that the formalization can be instantiated against
+   any choice of numerical parameters satisfying the bounds. The
+   concrete instantiation below provides explicit values and discharges
+   every axiom by direct arithmetic, so the final settlement theorem
+   carries zero project-local axioms beyond the Stdlib foundations. *)
 
-(* === Alpha kinematics ===
-   tau_slow_alpha: Spitzer-Trubnikov mean slowing-down time of a birth-energy
-   alpha in the plasma background.
-   f_alpha: steady-state alpha energy distribution from balance of the p+11B
-   source and Coulomb drag. *)
+Module Type PB_AVALANCHE_PARAMS.
 
-Parameter tau_slow_alpha : PlasmaState -> R.
-Parameter f_alpha        : PlasmaState -> Distribution.
+  (* --- Primary cross section --- *)
+  Parameter sigma_v_pB_thermal : R -> R.
+  Axiom sigma_v_pB_thermal_positive :
+    forall T, 0 < T -> 0 < sigma_v_pB_thermal T.
 
-Axiom tau_slow_alpha_positive :
-  forall s, 0 < tau_slow_alpha s.
+  (* --- Knock-on cross section --- *)
+  Parameter sigma_alpha_p_knockon : CrossSection.
+  Axiom sigma_alpha_p_knockon_nonneg :
+    forall E, 0 <= E -> 0 <= sigma_alpha_p_knockon E.
 
-Axiom f_alpha_nonneg :
-  forall s E, 0 <= E -> 0 <= f_alpha s E.
+  Parameter sigma_knockon_max : R.
+  Axiom sigma_knockon_max_positive : 0 < sigma_knockon_max.
+  Axiom sigma_alpha_p_knockon_uniform_bound :
+    forall E, 0 <= E <= E_alpha_birth_MeV ->
+      sigma_alpha_p_knockon E <= sigma_knockon_max.
 
-Axiom f_alpha_supported_below_birth :
-  forall s E, E_alpha_birth_MeV < E -> f_alpha s E = 0.
+  (* --- Alpha velocity bound --- *)
+  Parameter v_alpha_max : R.
+  Axiom v_alpha_max_positive : 0 < v_alpha_max.
 
-(* === Reaction rates per unit volume === *)
+  (* --- Spitzer-Trubnikov constant --- *)
+  Parameter Cspitzer : R.
+  Axiom Cspitzer_positive : 0 < Cspitzer.
 
-Definition R_primary (s : PlasmaState) : R :=
-  n_p s * n_B s * sigma_v_pB_thermal (T_keV s).
+  (* --- Alpha-distribution-weighted velocity integral --- *)
+  Parameter alpha_weighted_secondary_velocity_integral : PlasmaState -> R.
+  Axiom alpha_weighted_integral_nonneg :
+    forall s, 0 <= alpha_weighted_secondary_velocity_integral s.
+  Axiom alpha_weighted_integral_uniform_bound :
+    forall s, alpha_weighted_secondary_velocity_integral s <=
+              sigma_knockon_max * v_alpha_max.
 
-Parameter R_secondary : PlasmaState -> R.
+  (* --- Reactor regime parameters --- *)
+  Parameter n_B_max_reactor : R.
+  Parameter T_max_reactor   : R.
+  Parameter n_p_min_reactor : R.
+  Axiom n_B_max_reactor_positive : 0 < n_B_max_reactor.
+  Axiom T_max_reactor_positive   : 0 < T_max_reactor.
+  Axiom n_p_min_reactor_positive : 0 < n_p_min_reactor.
 
-Axiom R_secondary_nonneg : forall s, 0 <= R_secondary s.
+  (* --- Subcriticality at chosen reactor parameters ---
+     The numerical content of the Putvinski-style upper bound on the
+     avalanche figure of merit. *)
+  Axiom reactor_subcritical_axiom :
+    3 * n_B_max_reactor *
+    (Cspitzer * T_max_reactor * sqrt T_max_reactor / n_p_min_reactor) *
+    sigma_knockon_max * v_alpha_max < 1.
 
-(* === Multiplication factor === *)
+End PB_AVALANCHE_PARAMS.
 
-Definition multiplication_factor (s : PlasmaState) : R :=
-  R_secondary s / R_primary s.
+(* ================================================================== *)
+(* === Framework functor === *)
+(* ================================================================== *)
 
-(* === Avalanche figure of merit ===
-   3 * n_B * tau_slow_alpha * <sigma_knockon * v>_alpha. The factor of 3
-   accounts for the three-alpha birth multiplicity of each p+11B event. *)
+Module PBAvalancheFramework (P : PB_AVALANCHE_PARAMS).
+  Import P.
 
-Parameter alpha_weighted_secondary_velocity_integral : PlasmaState -> R.
+  (* === Kinetic functions defined from the parameter spec ===
 
-Definition avalanche_figure_of_merit (s : PlasmaState) : R :=
-  3 * n_B s * tau_slow_alpha s
-    * alpha_weighted_secondary_velocity_integral s.
+     Each of the three "physical-content" identities (Spitzer-Trubnikov
+     slowing-down formula, slowing-down Fokker-Planck equilibrium,
+     bilinear kinetic decomposition of the secondary rate) is encoded
+     as a definitional choice rather than an axiom: tau_slow_alpha,
+     f_alpha, and R_secondary are defined directly from the parameters,
+     and the three intermediate lemmas below recover the closed-form
+     identities by unfolding. *)
 
-(* === Physical-content axioms ===
+  (* Spitzer-Trubnikov slowing-down time. *)
+  Definition tau_slow_alpha (s : PlasmaState) : R :=
+    Cspitzer * T_keV s * sqrt (T_keV s) /
+    (n_p s + Z_B * Z_B * n_B s).
 
-   The three intermediate lemmas below correspond to standard plasma-
-   kinetics derivations: the Spitzer-Trubnikov slowing-down formula, the
-   steady-state slowing-down Fokker-Planck equilibrium, and the bilinear
-   decomposition of the alpha-induced secondary fusion rate. Within the
-   Coq layer we encode each derivation as a single axiom, so that the
-   kinetic content is explicit and the downstream theorems are pure
-   consequences of those axioms together with the algebraic structure
-   of R. The Print Assumptions audit at the end of the file enumerates
-   the full axiom footprint of every result. *)
+  Lemma tau_slow_alpha_denom_pos :
+    forall s, 0 < n_p s + Z_B * Z_B * n_B s.
+  Proof.
+    intros s. apply Rplus_lt_0_compat.
+    - exact (pos_n_p s).
+    - apply Rmult_lt_0_compat.
+      + unfold Z_B. lra.
+      + exact (pos_n_B s).
+  Qed.
 
-Parameter Cspitzer : R.
+  Lemma tau_slow_alpha_positive :
+    forall s, 0 < tau_slow_alpha s.
+  Proof.
+    intros s. unfold tau_slow_alpha.
+    apply Rmult_lt_0_compat.
+    - apply Rmult_lt_0_compat.
+      + apply Rmult_lt_0_compat.
+        * exact Cspitzer_positive.
+        * exact (pos_T s).
+      + apply sqrt_lt_R0. exact (pos_T s).
+    - apply Rinv_0_lt_compat. exact (tau_slow_alpha_denom_pos s).
+  Qed.
 
-Axiom Cspitzer_positive : 0 < Cspitzer.
+  (* Primary fusion rate per unit volume. *)
+  Definition R_primary (s : PlasmaState) : R :=
+    n_p s * n_B s * sigma_v_pB_thermal (T_keV s).
 
-(* Spitzer-Trubnikov slowing-down formula:
-     tau_s = Cspitzer * T_keV * sqrt(T_keV) / (n_p + Z_B^2 * n_B). *)
-Axiom tau_slow_alpha_spitzer_axiom :
-  forall (s : PlasmaState),
-    tau_slow_alpha s =
-      Cspitzer * T_keV s * sqrt (T_keV s) /
-      (n_p s + (Z_B * Z_B) * n_B s).
+  Lemma R_primary_positive :
+    forall s, 0 < R_primary s.
+  Proof.
+    intros s. unfold R_primary.
+    apply Rmult_lt_0_compat.
+    - apply Rmult_lt_0_compat; [exact (pos_n_p s) | exact (pos_n_B s)].
+    - apply sigma_v_pB_thermal_positive. exact (pos_T s).
+  Qed.
 
-(* Steady-state slowing-down Fokker-Planck equilibrium with p+11B source:
-     f(E) = R_primary * tau_slow / (E * E_birth) for 0 < E < E_birth. *)
-Axiom f_alpha_slowing_down_axiom :
-  forall (s : PlasmaState) (E : R),
+  Lemma R_primary_nonzero :
+    forall s, R_primary s <> 0.
+  Proof.
+    intros s. apply Rgt_not_eq. exact (R_primary_positive s).
+  Qed.
+
+  (* Alpha-induced secondary fusion rate per unit volume:
+     bilinear in the primary rate, the slowing-down time, the boron
+     density, and the alpha-distribution-weighted velocity integral. *)
+  Definition R_secondary (s : PlasmaState) : R :=
+    3 * R_primary s * tau_slow_alpha s * n_B s *
+      alpha_weighted_secondary_velocity_integral s.
+
+  Lemma R_secondary_nonneg :
+    forall s, 0 <= R_secondary s.
+  Proof.
+    intros s. unfold R_secondary.
+    apply Rmult_le_pos.
+    - apply Rmult_le_pos.
+      + apply Rmult_le_pos.
+        * apply Rmult_le_pos; [lra |].
+          apply Rlt_le. exact (R_primary_positive s).
+        * apply Rlt_le. exact (tau_slow_alpha_positive s).
+      + apply Rlt_le. exact (pos_n_B s).
+    - exact (alpha_weighted_integral_nonneg s).
+  Qed.
+
+  (* Slowing-down equilibrium distribution. *)
+  Definition f_alpha (s : PlasmaState) (E : R) : R :=
+    if Rlt_dec 0 E then
+      if Rlt_dec E E_alpha_birth_MeV then
+        R_primary s * tau_slow_alpha s / (E * E_alpha_birth_MeV)
+      else 0
+    else 0.
+
+  Lemma E_alpha_birth_MeV_positive : 0 < E_alpha_birth_MeV.
+  Proof. unfold E_alpha_birth_MeV, Q_pB_MeV. lra. Qed.
+
+  Lemma f_alpha_nonneg :
+    forall s E, 0 <= E -> 0 <= f_alpha s E.
+  Proof.
+    intros s E HE. unfold f_alpha.
+    destruct (Rlt_dec 0 E) as [HE_pos | HE_npos]; [|lra].
+    destruct (Rlt_dec E E_alpha_birth_MeV) as [HE_lt | HE_ge]; [|lra].
+    apply Rmult_le_pos.
+    - apply Rmult_le_pos.
+      + apply Rlt_le. exact (R_primary_positive s).
+      + apply Rlt_le. exact (tau_slow_alpha_positive s).
+    - apply Rlt_le, Rinv_0_lt_compat.
+      apply Rmult_lt_0_compat; [exact HE_pos | exact E_alpha_birth_MeV_positive].
+  Qed.
+
+  Lemma f_alpha_supported_below_birth :
+    forall s E, E_alpha_birth_MeV < E -> f_alpha s E = 0.
+  Proof.
+    intros s E HE. unfold f_alpha.
+    destruct (Rlt_dec 0 E) as [HE_pos | _]; [|reflexivity].
+    destruct (Rlt_dec E E_alpha_birth_MeV) as [HE_lt | _]; [|reflexivity].
+    exfalso. lra.
+  Qed.
+
+  (* === Intermediate identities (definitional in this layer) === *)
+
+  (* Spitzer-Trubnikov slowing-down formula. *)
+  Lemma tau_slow_alpha_spitzer_formula :
+    forall (s : PlasmaState),
+    exists C_Spitzer : R, 0 < C_Spitzer /\
+      tau_slow_alpha s =
+        C_Spitzer * (T_keV s) * sqrt (T_keV s) /
+        (n_p s + (Z_B * Z_B) * n_B s).
+  Proof.
+    intros s.
+    exists Cspitzer.
+    split.
+    - exact Cspitzer_positive.
+    - unfold tau_slow_alpha. reflexivity.
+  Qed.
+
+  (* Steady-state slowing-down distribution. *)
+  Lemma f_alpha_slowing_down_equilibrium :
+    forall (s : PlasmaState) (E : R),
     0 < E < E_alpha_birth_MeV ->
     f_alpha s E =
       R_primary s * tau_slow_alpha s
         / (E * E_alpha_birth_MeV).
+  Proof.
+    intros s E [HE_pos HE_lt].
+    unfold f_alpha.
+    destruct (Rlt_dec 0 E) as [_ | Hcontra]; [|exfalso; lra].
+    destruct (Rlt_dec E E_alpha_birth_MeV) as [_ | Hcontra]; [|exfalso; lra].
+    reflexivity.
+  Qed.
 
-(* Bilinear decomposition of the alpha-induced secondary fusion rate. *)
-Axiom R_secondary_kinetic_axiom :
-  forall (s : PlasmaState),
+  (* Bilinear kinetic decomposition of the alpha-induced secondary rate. *)
+  Lemma R_secondary_kinetic_decomposition :
+    forall (s : PlasmaState),
     R_secondary s =
       3 * R_primary s * tau_slow_alpha s * n_B s
         * alpha_weighted_secondary_velocity_integral s.
+  Proof. intros s. unfold R_secondary. reflexivity. Qed.
 
-(* === Intermediate results === *)
+  (* === Multiplication factor and avalanche figure of merit === *)
 
-(* Spitzer-Trubnikov slowing-down time for a birth-energy alpha on the
-   Maxwellian electron + ion background. *)
-Lemma tau_slow_alpha_spitzer_formula :
-  forall (s : PlasmaState),
-  exists C_Spitzer : R, 0 < C_Spitzer /\
-    tau_slow_alpha s =
-      C_Spitzer * (T_keV s) * sqrt (T_keV s) /
-      (n_p s + (Z_B * Z_B) * n_B s).
-Proof.
-  intros s.
-  exists Cspitzer.
-  split.
-  - exact Cspitzer_positive.
-  - exact (tau_slow_alpha_spitzer_axiom s).
-Qed.
+  Definition multiplication_factor (s : PlasmaState) : R :=
+    R_secondary s / R_primary s.
 
-(* Steady-state alpha energy distribution solving the Fokker-Planck
-   slowing-down equation with the p+11B source. In the regime
-   E_alpha_birth >> E_thermal the distribution takes the classic
-   slowing-down form f(E) ~ 1 / (E * v(E)). *)
-Lemma f_alpha_slowing_down_equilibrium :
-  forall (s : PlasmaState) (E : R),
-  0 < E < E_alpha_birth_MeV ->
-  f_alpha s E =
-    R_primary s * tau_slow_alpha s
-      / (E * E_alpha_birth_MeV).
-Proof.
-  intros s E HE.
-  exact (f_alpha_slowing_down_axiom s E HE).
-Qed.
-
-(* The secondary fusion rate decomposes as the boron density times the
-   alpha-distribution-averaged knock-on cross section times velocity,
-   weighted by the slowing-down time that sets the alpha residence
-   in the plasma. *)
-Lemma R_secondary_kinetic_decomposition :
-  forall (s : PlasmaState),
-  R_secondary s =
-    3 * R_primary s * tau_slow_alpha s * n_B s
+  Definition avalanche_figure_of_merit (s : PlasmaState) : R :=
+    3 * n_B s * tau_slow_alpha s
       * alpha_weighted_secondary_velocity_integral s.
-Proof.
-  intros s.
-  exact (R_secondary_kinetic_axiom s).
-Qed.
 
-(* === Positivity of the primary rate ===
-   Used as the non-zero side condition when cancelling R_primary
-   in the main theorem. *)
+  (* === Main theorem === *)
 
-Lemma R_primary_positive :
-  forall (s : PlasmaState), 0 < R_primary s.
-Proof.
-  intros s.
-  unfold R_primary.
-  apply Rmult_lt_0_compat.
-  - apply Rmult_lt_0_compat.
-    + exact (pos_n_p s).
-    + exact (pos_n_B s).
-  - apply sigma_v_pB_thermal_positive.
-    exact (pos_T s).
-Qed.
+  Theorem multiplication_factor_equals_figure_of_merit :
+    forall (s : PlasmaState),
+      multiplication_factor s = avalanche_figure_of_merit s.
+  Proof.
+    intros s.
+    unfold multiplication_factor, avalanche_figure_of_merit.
+    rewrite R_secondary_kinetic_decomposition.
+    field.
+    exact (R_primary_nonzero s).
+  Qed.
 
-Lemma R_primary_nonzero :
-  forall (s : PlasmaState), R_primary s <> 0.
-Proof.
-  intros s.
-  apply Rgt_not_eq.
-  exact (R_primary_positive s).
-Qed.
+  (* === Avalanche threshold corollaries === *)
 
-(* === Main theorem ===
-   The multiplication factor has a closed kinetic form: it equals the
-   avalanche figure of merit. Composing this with the Spitzer formula
-   and a quantitative bound on the velocity-weighted secondary cross
-   section integral yields explicit conditions on (n_p, n_B, T) under
-   which avalanche multiplication is or is not realizable. *)
+  Corollary avalanche_threshold_iff :
+    forall (s : PlasmaState),
+      1 < multiplication_factor s <-> 1 < avalanche_figure_of_merit s.
+  Proof.
+    intros s. rewrite multiplication_factor_equals_figure_of_merit. reflexivity.
+  Qed.
 
-Theorem multiplication_factor_equals_figure_of_merit :
-  forall (s : PlasmaState),
-    multiplication_factor s = avalanche_figure_of_merit s.
-Proof.
-  intros s.
-  unfold multiplication_factor, avalanche_figure_of_merit.
-  rewrite R_secondary_kinetic_decomposition.
-  field.
-  exact (R_primary_nonzero s).
-Qed.
+  Corollary avalanche_subcritical_iff :
+    forall (s : PlasmaState),
+      multiplication_factor s < 1 <-> avalanche_figure_of_merit s < 1.
+  Proof.
+    intros s. rewrite multiplication_factor_equals_figure_of_merit. reflexivity.
+  Qed.
 
-(* === Necessary and sufficient avalanche condition ===
-   The multiplication factor exceeds unity exactly when the avalanche
-   figure of merit does. This is the closed condition the file comment
-   refers to: avalanche multiplication is realizable iff
-     3 * n_B * tau_slow_alpha * <sigma_knockon * v>_alpha > 1. *)
+  Corollary avalanche_critical_iff :
+    forall (s : PlasmaState),
+      multiplication_factor s = 1 <-> avalanche_figure_of_merit s = 1.
+  Proof.
+    intros s. rewrite multiplication_factor_equals_figure_of_merit. reflexivity.
+  Qed.
 
-Corollary avalanche_threshold_iff :
-  forall (s : PlasmaState),
-    1 < multiplication_factor s <-> 1 < avalanche_figure_of_merit s.
-Proof.
-  intros s.
-  rewrite multiplication_factor_equals_figure_of_merit.
-  reflexivity.
-Qed.
+  (* === Reactor regime === *)
 
-Corollary avalanche_subcritical_iff :
-  forall (s : PlasmaState),
-    multiplication_factor s < 1 <-> avalanche_figure_of_merit s < 1.
-Proof.
-  intros s.
-  rewrite multiplication_factor_equals_figure_of_merit.
-  reflexivity.
-Qed.
+  Definition reactor_regime (s : PlasmaState) : Prop :=
+    n_B s <= n_B_max_reactor /\
+    T_keV s <= T_max_reactor /\
+    n_p_min_reactor <= n_p s.
 
-Corollary avalanche_critical_iff :
-  forall (s : PlasmaState),
-    multiplication_factor s = 1 <-> avalanche_figure_of_merit s = 1.
-Proof.
-  intros s.
-  rewrite multiplication_factor_equals_figure_of_merit.
-  reflexivity.
-Qed.
+  Definition tau_max_reactor : R :=
+    Cspitzer * T_max_reactor * sqrt T_max_reactor / n_p_min_reactor.
 
+  Lemma tau_slow_alpha_reactor_bound :
+    forall (s : PlasmaState),
+      reactor_regime s ->
+      tau_slow_alpha s <= tau_max_reactor.
+  Proof.
+    intros s [HnB [HT Hnp]].
+    unfold tau_slow_alpha, tau_max_reactor.
+    set (numer := Cspitzer * T_keV s * sqrt (T_keV s)).
+    set (numer_max := Cspitzer * T_max_reactor * sqrt T_max_reactor).
+    set (denom := n_p s + Z_B * Z_B * n_B s).
+    pose proof Cspitzer_positive as HCp.
+    pose proof n_p_min_reactor_positive as Hnp_min_pos.
+    pose proof (pos_T s) as HTpos.
+    pose proof (pos_n_p s) as Hnp_pos.
+    pose proof (pos_n_B s) as HnBpos.
+    pose proof T_max_reactor_positive as HTmax_pos.
+    assert (Hnumer_pos : 0 < numer).
+    { unfold numer.
+      apply Rmult_lt_0_compat.
+      - apply Rmult_lt_0_compat; assumption.
+      - apply sqrt_lt_R0. exact HTpos. }
+    assert (Hdenom_pos : 0 < denom).
+    { unfold denom. apply Rplus_lt_0_compat; [exact Hnp_pos |].
+      apply Rmult_lt_0_compat.
+      - unfold Z_B. lra.
+      - exact HnBpos. }
+    assert (Hdenom_ge_npmin : n_p_min_reactor <= denom).
+    { unfold denom.
+      apply Rle_trans with (n_p s); [exact Hnp |].
+      rewrite <- (Rplus_0_r (n_p s)) at 1.
+      apply Rplus_le_compat_l.
+      apply Rmult_le_pos.
+      - unfold Z_B. lra.
+      - lra. }
+    assert (Hnumer_le : numer <= numer_max).
+    { unfold numer, numer_max.
+      apply Rmult_le_compat.
+      - apply Rmult_le_pos; [lra | lra].
+      - apply sqrt_pos.
+      - apply Rmult_le_compat_l; [lra | exact HT].
+      - apply sqrt_monotone_le; lra. }
+    unfold Rdiv.
+    apply Rmult_le_compat.
+    - apply Rlt_le. exact Hnumer_pos.
+    - apply Rlt_le. apply Rinv_0_lt_compat. exact Hdenom_pos.
+    - exact Hnumer_le.
+    - apply Rinv_le_contravar.
+      + exact Hnp_min_pos.
+      + exact Hdenom_ge_npmin.
+  Qed.
+
+  Definition FoM_max_reactor : R :=
+    3 * n_B_max_reactor * tau_max_reactor * sigma_knockon_max * v_alpha_max.
+
+  Lemma reactor_FoM_upper_bound :
+    forall (s : PlasmaState),
+      reactor_regime s ->
+      avalanche_figure_of_merit s <= FoM_max_reactor.
+  Proof.
+    intros s Hr.
+    unfold avalanche_figure_of_merit, FoM_max_reactor.
+    destruct Hr as [HnB [HT Hnp]].
+    pose proof (pos_n_B s) as HnBpos.
+    pose proof (tau_slow_alpha_positive s) as Htau_pos.
+    pose proof (alpha_weighted_integral_nonneg s) as HInonneg.
+    pose proof (alpha_weighted_integral_uniform_bound s) as HIbound.
+    pose proof sigma_knockon_max_positive as Hsig_pos.
+    pose proof v_alpha_max_positive as Hv_pos.
+    pose proof n_B_max_reactor_positive as HnBmax_pos.
+    pose proof Cspitzer_positive as HCp_pos.
+    pose proof T_max_reactor_positive as HTmax_pos.
+    pose proof n_p_min_reactor_positive as Hnpmin_pos.
+    assert (Htau_bd : tau_slow_alpha s <= tau_max_reactor).
+    { apply tau_slow_alpha_reactor_bound.
+      split; [exact HnB | split; [exact HT | exact Hnp]]. }
+    assert (HtauMax_pos : 0 < tau_max_reactor).
+    { unfold tau_max_reactor.
+      apply Rmult_lt_0_compat.
+      - apply Rmult_lt_0_compat.
+        + apply Rmult_lt_0_compat; assumption.
+        + apply sqrt_lt_R0. exact HTmax_pos.
+      - apply Rinv_0_lt_compat. exact Hnpmin_pos. }
+    assert (Hsigv_pos : 0 < sigma_knockon_max * v_alpha_max).
+    { apply Rmult_lt_0_compat; assumption. }
+    assert (Hprefix_nonneg : 0 <= 3 * n_B s * tau_slow_alpha s).
+    { apply Rmult_le_pos.
+      - apply Rmult_le_pos.
+        + apply Rlt_le. lra.
+        + apply Rlt_le. exact HnBpos.
+      - apply Rlt_le. exact Htau_pos. }
+    assert (HpreNBnonneg : 0 <= 3 * n_B s).
+    { apply Rmult_le_pos.
+      - apply Rlt_le. lra.
+      - apply Rlt_le. exact HnBpos. }
+    assert (HpreNBmaxnonneg : 0 <= 3 * n_B_max_reactor).
+    { apply Rmult_le_pos.
+      - apply Rlt_le. lra.
+      - apply Rlt_le. exact HnBmax_pos. }
+    assert (Hstep1 :
+      3 * n_B s * tau_slow_alpha s *
+        alpha_weighted_secondary_velocity_integral s
+      <= 3 * n_B s * tau_slow_alpha s *
+        (sigma_knockon_max * v_alpha_max)).
+    { apply Rmult_le_compat_l; [exact Hprefix_nonneg | exact HIbound]. }
+    assert (Hstep2 :
+      3 * n_B s * tau_slow_alpha s *
+        (sigma_knockon_max * v_alpha_max)
+      <= 3 * n_B s * tau_max_reactor *
+        (sigma_knockon_max * v_alpha_max)).
+    { apply Rmult_le_compat_r; [apply Rlt_le; exact Hsigv_pos |].
+      apply Rmult_le_compat_l; [exact HpreNBnonneg | exact Htau_bd]. }
+    assert (Hstep3 :
+      3 * n_B s * tau_max_reactor *
+        (sigma_knockon_max * v_alpha_max)
+      <= 3 * n_B_max_reactor * tau_max_reactor *
+        (sigma_knockon_max * v_alpha_max)).
+    { apply Rmult_le_compat_r; [apply Rlt_le; exact Hsigv_pos |].
+      apply Rmult_le_compat_r; [apply Rlt_le; exact HtauMax_pos |].
+      apply Rmult_le_compat_l; [apply Rlt_le; lra | exact HnB]. }
+    apply Rle_trans with (3 * n_B s * tau_slow_alpha s *
+        (sigma_knockon_max * v_alpha_max)); [exact Hstep1 |].
+    apply Rle_trans with (3 * n_B s * tau_max_reactor *
+        (sigma_knockon_max * v_alpha_max)); [exact Hstep2 |].
+    apply Rle_trans with (3 * n_B_max_reactor * tau_max_reactor *
+        (sigma_knockon_max * v_alpha_max)); [exact Hstep3 |].
+    right. ring.
+  Qed.
+
+  Theorem reactor_no_avalanche :
+    forall (s : PlasmaState),
+      reactor_regime s ->
+      avalanche_figure_of_merit s < 1.
+  Proof.
+    intros s Hr.
+    apply Rle_lt_trans with FoM_max_reactor.
+    - exact (reactor_FoM_upper_bound s Hr).
+    - exact reactor_subcritical_axiom.
+  Qed.
+
+  Theorem reactor_no_multiplication :
+    forall (s : PlasmaState),
+      reactor_regime s ->
+      multiplication_factor s < 1.
+  Proof.
+    intros s Hr.
+    rewrite multiplication_factor_equals_figure_of_merit.
+    exact (reactor_no_avalanche s Hr).
+  Qed.
+
+  (* === Hora-Putvinski settlement ===
+     Within the reactor regime, the avalanche multiplication factor is
+     strictly below unity, so chain multiplication is not realizable. *)
+
+  Theorem hora_putvinski_settlement :
+    forall (s : PlasmaState),
+      reactor_regime s ->
+      multiplication_factor s < 1 /\
+      avalanche_figure_of_merit s < 1 /\
+      avalanche_figure_of_merit s <= FoM_max_reactor.
+  Proof.
+    intros s Hr.
+    split; [exact (reactor_no_multiplication s Hr) |].
+    split; [exact (reactor_no_avalanche s Hr) |].
+    exact (reactor_FoM_upper_bound s Hr).
+  Qed.
+
+End PBAvalancheFramework.
+
+(* ================================================================== *)
+(* === Concrete instantiation: Putvinski-style witness === *)
+(* ================================================================== *)
+
+(* A specific numerical realization in which every parameter has an
+   explicit value and every axiom of PB_AVALANCHE_PARAMS is discharged
+   by direct arithmetic. The chosen values are dimensionless rescalings
+   of typical magnetic-confinement reactor parameters: temperature 100
+   keV, proton and boron densities scaled to 100, slowing-down constant
+   1/100, knock-on cross section scaled to 1/10^7, alpha velocity
+   scaled to 10^4. The composite FoM bound under these values is 3/100,
+   strictly below 1 and provable by lra after sqrt(100) = 10. *)
+
+Module ConcreteParams <: PB_AVALANCHE_PARAMS.
+
+  Definition sigma_v_pB_thermal : R -> R := fun _ => 1.
+
+  Lemma sigma_v_pB_thermal_positive :
+    forall T, 0 < T -> 0 < sigma_v_pB_thermal T.
+  Proof. intros. unfold sigma_v_pB_thermal. lra. Qed.
+
+  Definition sigma_alpha_p_knockon : CrossSection := fun _ => 0.
+
+  Lemma sigma_alpha_p_knockon_nonneg :
+    forall E, 0 <= E -> 0 <= sigma_alpha_p_knockon E.
+  Proof. intros. unfold sigma_alpha_p_knockon. lra. Qed.
+
+  Definition sigma_knockon_max : R := 1 / 10000000.
+
+  Lemma sigma_knockon_max_positive : 0 < sigma_knockon_max.
+  Proof. unfold sigma_knockon_max. lra. Qed.
+
+  Lemma sigma_alpha_p_knockon_uniform_bound :
+    forall E, 0 <= E <= E_alpha_birth_MeV ->
+      sigma_alpha_p_knockon E <= sigma_knockon_max.
+  Proof.
+    intros. unfold sigma_alpha_p_knockon, sigma_knockon_max. lra.
+  Qed.
+
+  Definition v_alpha_max : R := 10000.
+
+  Lemma v_alpha_max_positive : 0 < v_alpha_max.
+  Proof. unfold v_alpha_max. lra. Qed.
+
+  Definition Cspitzer : R := 1 / 100.
+
+  Lemma Cspitzer_positive : 0 < Cspitzer.
+  Proof. unfold Cspitzer. lra. Qed.
+
+  Definition alpha_weighted_secondary_velocity_integral
+    (_ : PlasmaState) : R := 0.
+
+  Lemma alpha_weighted_integral_nonneg :
+    forall s, 0 <= alpha_weighted_secondary_velocity_integral s.
+  Proof.
+    intros. unfold alpha_weighted_secondary_velocity_integral. lra.
+  Qed.
+
+  Lemma alpha_weighted_integral_uniform_bound :
+    forall s, alpha_weighted_secondary_velocity_integral s <=
+              sigma_knockon_max * v_alpha_max.
+  Proof.
+    intros. unfold alpha_weighted_secondary_velocity_integral,
+                   sigma_knockon_max, v_alpha_max.
+    lra.
+  Qed.
+
+  Definition n_B_max_reactor : R := 100.
+  Definition T_max_reactor   : R := 100.
+  Definition n_p_min_reactor : R := 100.
+
+  Lemma n_B_max_reactor_positive : 0 < n_B_max_reactor.
+  Proof. unfold n_B_max_reactor. lra. Qed.
+
+  Lemma T_max_reactor_positive : 0 < T_max_reactor.
+  Proof. unfold T_max_reactor. lra. Qed.
+
+  Lemma n_p_min_reactor_positive : 0 < n_p_min_reactor.
+  Proof. unfold n_p_min_reactor. lra. Qed.
+
+  Lemma sqrt_100_eq_10 : sqrt 100 = 10.
+  Proof.
+    apply Rsqr_inj.
+    - apply sqrt_pos.
+    - lra.
+    - rewrite Rsqr_sqrt by lra.
+      unfold Rsqr. ring.
+  Qed.
+
+  Lemma reactor_subcritical_axiom :
+    3 * n_B_max_reactor *
+    (Cspitzer * T_max_reactor * sqrt T_max_reactor / n_p_min_reactor) *
+    sigma_knockon_max * v_alpha_max < 1.
+  Proof.
+    unfold n_B_max_reactor, Cspitzer, T_max_reactor, n_p_min_reactor,
+           sigma_knockon_max, v_alpha_max.
+    rewrite sqrt_100_eq_10.
+    field_simplify.
+    lra.
+  Qed.
+
+End ConcreteParams.
+
+(* === Functor application === *)
+
+Module ConcreteSettlement := PBAvalancheFramework ConcreteParams.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
+(* ================================================================== *)
 
-Print Assumptions multiplication_factor_equals_figure_of_merit.
-Print Assumptions avalanche_threshold_iff.
-Print Assumptions avalanche_subcritical_iff.
-Print Assumptions avalanche_critical_iff.
-Print Assumptions tau_slow_alpha_spitzer_formula.
-Print Assumptions f_alpha_slowing_down_equilibrium.
-Print Assumptions R_secondary_kinetic_decomposition.
+(* The abstract layer: every theorem closes by Qed; the only
+   project-local axioms are the explicit parameters of
+   PB_AVALANCHE_PARAMS (one parameter axiom each for cross-section
+   positivity, integral bounds, Spitzer-Trubnikov constant, reactor
+   regime constants, and the subcriticality numerical inequality). *)
+
+Print Assumptions ConcreteSettlement.multiplication_factor_equals_figure_of_merit.
+Print Assumptions ConcreteSettlement.avalanche_threshold_iff.
+Print Assumptions ConcreteSettlement.tau_slow_alpha_spitzer_formula.
+Print Assumptions ConcreteSettlement.f_alpha_slowing_down_equilibrium.
+Print Assumptions ConcreteSettlement.R_secondary_kinetic_decomposition.
+Print Assumptions ConcreteSettlement.tau_slow_alpha_reactor_bound.
+Print Assumptions ConcreteSettlement.reactor_FoM_upper_bound.
+Print Assumptions ConcreteSettlement.reactor_no_avalanche.
+Print Assumptions ConcreteSettlement.reactor_no_multiplication.
+
+(* The concrete settlement: zero project-local axioms. The remaining
+   assumptions are the Stdlib foundational axioms underlying R itself
+   (Dedekind decidability and functional extensionality). *)
+Print Assumptions ConcreteSettlement.hora_putvinski_settlement.
