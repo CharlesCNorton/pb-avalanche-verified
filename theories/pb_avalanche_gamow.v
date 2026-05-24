@@ -79,6 +79,7 @@ Section GamowCrossSection.
 
 Variable S_factor : R -> R.
 Hypothesis S_factor_pos : forall E, 0 < E -> 0 < S_factor E.
+Hypothesis S_factor_cont : forall E, 0 < E -> continuous S_factor E.
 
 Definition sigma_gamow (E : R) : R :=
   S_factor E / E * exp (- gamow_factor E).
@@ -104,6 +105,66 @@ Proof.
   apply Rmult_lt_0_compat.
   - apply sigma_gamow_pos; exact HE.
   - apply exp_pos.
+Qed.
+
+(* The Gamow cross section is continuous on the open energy axis, so its
+   Maxwellian-weighted reactivity is a genuine positive integral: the
+   abstract positive primary rate the avalanche framework assumes is
+   realized by the tunneling cross section over any reactive window. *)
+Lemma continuous_Rinv_at : forall x, x <> 0 -> continuous (fun y => / y) x.
+Proof.
+  intros x Hx. apply (ex_derive_continuous (K := R_AbsRing) (V := R_NormedModule)).
+  exists (- / (x * x)). auto_derive; [ exact Hx | field; exact Hx ].
+Qed.
+
+Lemma continuous_exp_at : forall x, continuous (fun y => exp y) x.
+Proof.
+  intro x. apply (ex_derive_continuous (K := R_AbsRing) (V := R_NormedModule)).
+  exists (exp x). apply is_derive_exp.
+Qed.
+
+Lemma sigma_gamow_continuous : forall E, 0 < E -> continuous sigma_gamow E.
+Proof.
+  intros E HE. unfold sigma_gamow, gamow_factor, Rdiv.
+  assert (HsE : 0 < sqrt E) by (apply sqrt_lt_R0; exact HE).
+  apply (continuous_mult (K := R_AbsRing) (fun E => S_factor E * / E)
+           (fun E => exp (- (b_G * / sqrt E)))).
+  - apply (continuous_mult (K := R_AbsRing) S_factor (fun E => / E)).
+    + apply S_factor_cont; exact HE.
+    + apply continuous_Rinv_at. lra.
+  - apply (continuous_comp (fun E => - (b_G * / sqrt E)) (fun y => exp y)).
+    + apply (continuous_opp (V := R_NormedModule) (fun E => b_G * / sqrt E)).
+      apply (continuous_mult (K := R_AbsRing) (fun _ => b_G) (fun E => / sqrt E)).
+      * apply continuous_const.
+      * apply (continuous_comp sqrt (fun s => / s)).
+        -- apply continuous_sqrt.
+        -- apply continuous_Rinv_at. lra.
+    + apply continuous_exp_at.
+Qed.
+
+Lemma maxwellian_gamow_integrand_continuous :
+  forall T E, 0 < E -> continuous (maxwellian_gamow_integrand T) E.
+Proof.
+  intros T E HE. unfold maxwellian_gamow_integrand.
+  apply (continuous_mult (K := R_AbsRing) sigma_gamow (fun E => exp (- E / T))).
+  - apply sigma_gamow_continuous; exact HE.
+  - apply (continuous_comp (fun E => - E / T) (fun y => exp y)).
+    + unfold Rdiv.
+      apply (continuous_mult (K := R_AbsRing) (fun E => - E) (fun _ => / T)).
+      * apply (continuous_opp (V := R_NormedModule) (fun E => E)). apply continuous_id.
+      * apply continuous_const.
+    + apply continuous_exp_at.
+Qed.
+
+(* The Maxwellian-Gamow reactivity over any reactive window [a,b] (a > 0)
+   is strictly positive: a positive primary rate from tunneling. *)
+Theorem gamow_reactivity_positive :
+  forall T a b, 0 < T -> 0 < a -> a < b ->
+    0 < RInt (maxwellian_gamow_integrand T) a b.
+Proof.
+  intros T a b HT Ha Hab. apply RInt_gt_0; [ exact Hab | | ].
+  - intros x [Hx1 Hx2]. apply maxwellian_gamow_integrand_pos; [ exact HT | lra ].
+  - intros x [Hx1 Hx2]. apply maxwellian_gamow_integrand_continuous. lra.
 Qed.
 
 End GamowCrossSection.
@@ -705,6 +766,7 @@ Print Assumptions gamow_factor_pos.
 Print Assumptions gamow_factor_decreasing.
 Print Assumptions gamow_peak_pos.
 Print Assumptions gamow_peak_monotone_T.
+Print Assumptions gamow_reactivity_positive.
 Print Assumptions cw_2.
 Print Assumptions cw_3.
 Print Assumptions cw_solves_coulomb_equation.
