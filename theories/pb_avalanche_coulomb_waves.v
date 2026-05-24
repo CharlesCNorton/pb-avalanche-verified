@@ -26,7 +26,8 @@
 (*                                                                            *)
 (******************************************************************************)
 
-From Stdlib Require Import Reals Lra Lia.
+From Stdlib Require Import Reals Lra Lia Factorial.
+From Coquelicot Require Import Coquelicot.
 Open Scope R_scope.
 
 (* ================================================================== *)
@@ -324,6 +325,122 @@ Theorem cw_regular_boundary :
 Proof. intros eta. split; reflexivity. Qed.
 
 (* ================================================================== *)
+(* === Power-series convergence of the Coulomb coefficients === *)
+(* ================================================================== *)
+
+Lemma INR_fact_S : forall k, INR (fact (S k)) = INR (S k) * INR (fact k).
+Proof. intro k. rewrite fact_simpl. rewrite mult_INR. reflexivity. Qed.
+Lemma INR_fact_SS : forall k,
+  INR (fact (S (S k))) = INR (S (S k)) * (INR (S k) * INR (fact k)).
+Proof. intro k. rewrite (fact_simpl (S k)). rewrite mult_INR. rewrite INR_fact_S. reflexivity. Qed.
+
+Section Cw.
+Variable eta : R.
+Definition Mc := 2 * Rabs eta + 2.
+
+Lemma Mc_ge1 : 1 <= Mc.
+Proof. unfold Mc. pose proof (Rabs_pos eta). lra. Qed.
+
+Lemma fact_pos : forall k, 0 < INR (fact k).
+Proof. intro k. apply lt_0_INR. apply lt_O_fact. Qed.
+
+Lemma scalar_ineq : forall k : nat,
+  2 * Rabs eta * Mc / INR (S k) + 1 <= Mc * Mc.
+Proof.
+  intro k. pose proof (Rabs_pos eta) as He.
+  assert (HSk : 1 <= INR (S k)) by (rewrite S_INR; pose proof (pos_INR k); lra).
+  assert (Hdiv : 2 * Rabs eta * Mc / INR (S k) <= 2 * Rabs eta * Mc).
+  { apply Rle_div_l. lra. apply Rle_trans with (2 * Rabs eta * Mc * 1); [lra|].
+    apply Rmult_le_compat_l; [ unfold Mc; nra | exact HSk ]. }
+  unfold Mc in *. nra.
+Qed.
+
+Lemma cw_bound_pair :
+  forall k, Rabs (cw eta k) <= Mc ^ k / INR (fact k)
+         /\ Rabs (cw eta (S k)) <= Mc ^ (S k) / INR (fact (S k)).
+Proof.
+  pose proof Mc_ge1 as HM. pose proof (Rabs_pos eta) as Heta.
+  induction k as [|k [IH1 IH2]].
+  - split.
+    + simpl. rewrite Rabs_R0. lra.
+    + rewrite cw_1. rewrite Rabs_R1. simpl (fact 1). simpl (INR 1).
+      unfold Mc; simpl; lra.
+  - split; [exact IH2 |].
+    assert (Hrec : cw eta (S (S k))
+      = (2 * eta * cw eta (S k) - cw eta k) / (INR (S (S k)) * INR (S k)))
+      by reflexivity.
+    set (A := Mc ^ k / INR (fact k)).
+    set (B := Mc ^ (S k) / INR (fact (S k))).
+    pose proof (fact_pos k) as Hfk. pose proof (fact_pos (S k)) as HfSk.
+    pose proof (fact_pos (S (S k))) as HfSSk.
+    assert (HApos : 0 < A).
+    { unfold A. apply Rdiv_lt_0_compat; [apply pow_lt; lra | exact Hfk]. }
+    (* factorial relations: B = Mc/(S k) * A *)
+    assert (HBA : B = Mc / INR (S k) * A).
+    { unfold A, B. rewrite INR_fact_S. simpl (Mc ^ (S k)). field.
+      split; [ apply Rgt_not_eq; exact Hfk
+             | apply Rgt_not_eq, lt_0_INR; lia ]. }
+    assert (HRHS : Mc ^ (S (S k)) / INR (fact (S (S k))) * (INR (S (S k)) * INR (S k))
+                 = Mc * Mc * A).
+    { unfold A. rewrite INR_fact_SS. simpl (Mc ^ (S (S k))). field.
+      repeat split; try (apply Rgt_not_eq);
+      try (apply lt_0_INR; lia); try exact Hfk. }
+    rewrite Hrec.
+    assert (Hd : 0 < INR (S (S k)) * INR (S k))
+      by (apply Rmult_lt_0_compat; apply lt_0_INR; lia).
+    rewrite Rabs_div by (apply Rgt_not_eq; exact Hd).
+    rewrite (Rabs_right (INR (S (S k)) * INR (S k))) by lra.
+    apply Rle_div_l; [exact Hd |].
+    rewrite HRHS.
+    eapply Rle_trans; [apply Rabs_triang |].
+    rewrite Rabs_Ropp, !Rabs_mult, (Rabs_right 2) by lra.
+    eapply Rle_trans;
+      [apply Rplus_le_compat;
+        [apply Rmult_le_compat_l; [lra | exact IH2]
+        | exact IH1] |].
+    fold A. fold B. rewrite HBA.
+    pose proof (scalar_ineq k) as Hsc.
+    assert (HSkne : INR (S k) <> 0) by (apply Rgt_not_eq, lt_0_INR; lia).
+    apply Rle_trans with (A * (2 * Rabs eta * Mc / INR (S k) + 1)).
+    { right. field. exact HSkne. }
+    apply Rle_trans with (A * (Mc * Mc)).
+    { apply Rmult_le_compat_l; [lra | exact Hsc]. }
+    right. ring.
+Qed.
+
+Lemma cw_bound : forall k, Rabs (cw eta k) <= Mc ^ k / INR (fact k).
+Proof. intro k. apply (cw_bound_pair k). Qed.
+
+
+Lemma exp_dom_ex_series : forall x,
+  ex_series (fun k => x ^ k / INR (fact k)).
+Proof.
+  intro x. exists (exp x).
+  pose proof (is_exp_Reals x) as Hp. unfold is_pseries in Hp.
+  apply (is_series_ext (fun n => scal (x ^ n) (/ INR (fact n)))).
+  - intro n. unfold scal; simpl; unfold mult; simpl. unfold Rdiv. ring.
+  - exact Hp.
+Qed.
+
+Lemma cw_series_ex : forall rho, ex_series (fun k => cw eta k * rho ^ k).
+Proof.
+  intro rho.
+  apply (ex_series_le (fun k => cw eta k * rho ^ k)
+           (fun k => (Mc * Rabs rho) ^ k / INR (fact k))).
+  - intro n.
+    change (norm (cw eta n * rho ^ n))
+      with (Rabs (cw eta n * rho ^ n)).
+    rewrite Rabs_mult. rewrite <- RPow_abs.
+    rewrite Rpow_mult_distr.
+    apply Rle_trans with ((Mc ^ n / INR (fact n)) * Rabs rho ^ n).
+    + apply Rmult_le_compat_r; [ apply pow_le, Rabs_pos | apply cw_bound ].
+    + right. field. apply Rgt_not_eq, fact_pos.
+  - apply exp_dom_ex_series.
+Qed.
+
+End Cw.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
@@ -331,6 +448,8 @@ Print Assumptions cw_2.
 Print Assumptions cw_3.
 Print Assumptions cw_solves_coulomb_equation.
 Print Assumptions cw_regular_boundary.
+Print Assumptions cw_bound.
+Print Assumptions cw_series_ex.
 Print Assumptions sommerfeld_eta_pos.
 Print Assumptions gamow_factor_quantum_pos.
 Print Assumptions gamow_factor_quantum_lt_1.
