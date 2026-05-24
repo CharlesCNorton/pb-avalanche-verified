@@ -32,6 +32,7 @@
 
 From Stdlib Require Import Reals Lra.
 From Coquelicot Require Import Coquelicot.
+From PBAvalanche Require Import pb_avalanche_iaea.
 Open Scope R_scope.
 
 (* ================================================================== *)
@@ -213,11 +214,217 @@ Qed.
 
 End TightCurvature.
 
+(* The sharp 1/8 interpolation-error bound applied to the IAEA
+   piecewise-linear segment interpolant. *)
+Theorem interp_segment_curvature_error_sharp :
+  forall (sigma df ddf : R -> R) (a b M2 : R),
+    a < b ->
+    0 <= M2 ->
+    (forall x, a <= x <= b -> is_derive sigma x (df x)) ->
+    (forall x, a <= x <= b -> is_derive df x (ddf x)) ->
+    (forall x, a <= x <= b -> Rabs (ddf x) <= M2) ->
+    forall t, a <= t <= b ->
+      Rabs (sigma t - interp_segment a (sigma a) b (sigma b) t)
+        <= M2 * (b - a) * (b - a) / 8.
+Proof.
+  intros sigma df ddf a b M2 Hab HM2 Hd1 Hd2 Hbnd t Ht.
+  assert (Hlin : interp_segment a (sigma a) b (sigma b) t = Lin sigma a b t).
+  { unfold interp_segment, Lin, slope. field. lra. }
+  rewrite Hlin.
+  assert (Hpos : 0 <= M2 * (b - a) * (b - a) / 8).
+  { repeat apply Rmult_le_pos; lra. }
+  destruct (Rle_lt_dec t a) as [Hta | Hta].
+  - assert (Hte : t = a) by lra. subst t.
+    unfold Lin, slope. replace (sigma a - (sigma a + _ * (a - a))) with 0 by ring.
+    rewrite Rabs_R0. exact Hpos.
+  - destruct (Rle_lt_dec b t) as [Htb | Htb].
+    + assert (Hte : t = b) by lra. subst t.
+      unfold Lin, slope.
+      replace (sigma b - (sigma a + (sigma b - sigma a) / (b - a) * (b - a)))
+        with 0 by (field; lra).
+      rewrite Rabs_R0. exact Hpos.
+    + apply (tight_curvature_bound sigma df ddf a b Hab Hd1 Hd2 M2 Hbnd t).
+      split; assumption.
+Qed.
+
+(* ================================================================== *)
+(* === General trapezoidal (Euler-Maclaurin order 2) error === *)
+(* ================================================================== *)
+
+Lemma RInt_parabola : forall a b, a <= b ->
+  RInt (fun t => (t - a) * (b - t)) a b = (b - a)^3 / 6.
+Proof.
+  intros a b Hab.
+  apply is_RInt_unique.
+  replace ((b - a)^3 / 6)
+    with ((- b^3/3 + (a+b)*b^2/2 - a*b*b) - (- a^3/3 + (a+b)*a^2/2 - a*b*a))
+    by (simpl; field).
+  apply (is_RInt_derive
+           (fun t => - t^3/3 + (a+b)*t^2/2 - a*b*t)
+           (fun t => (t - a) * (b - t)) a b).
+  - intros x _. auto_derive. trivial. nra.
+  - intros x _.
+    apply (continuous_mult (fun t => t - a) (fun t => b - t));
+      [ apply (continuous_minus (V:=R_NormedModule) (fun t => t) (fun _ => a));
+          [apply continuous_id | apply continuous_const]
+      | apply (continuous_minus (V:=R_NormedModule) (fun _ => b) (fun t => t));
+          [apply continuous_const | apply continuous_id] ].
+Qed.
+
+(* RInt bridge helpers *)
+Lemma RInt_scal_R : forall (f : R -> R) (a b k : R),
+  ex_RInt f a b -> RInt (fun x => k * f x) a b = k * RInt f a b.
+Proof.
+  intros f a b k Hf. pose proof (RInt_scal f a b k Hf) as H.
+  unfold scal in H; simpl in H; unfold mult in H; simpl in H. exact H.
+Qed.
+
+Lemma RInt_minus_R : forall (f g : R -> R) (a b : R),
+  ex_RInt f a b -> ex_RInt g a b ->
+  RInt (fun x => f x - g x) a b = RInt f a b - RInt g a b.
+Proof.
+  intros f g a b Hf Hg. pose proof (RInt_minus f g a b Hf Hg) as H.
+  unfold minus in H; simpl in H; unfold plus, opp in H; simpl in H. exact H.
+Qed.
+
+Section T3.
+Variables sigma df ddf : R -> R.
+Variables a b M2 : R.
+Hypothesis Hab : a < b.
+Hypothesis HM2 : 0 <= M2.
+Hypothesis Hd1 : forall x, a <= x <= b -> is_derive sigma x (df x).
+Hypothesis Hd2 : forall x, a <= x <= b -> is_derive df x (ddf x).
+Hypothesis Hbnd : forall x, a <= x <= b -> Rabs (ddf x) <= M2.
+
+Lemma sigma_cont : forall x, a <= x <= b -> continuous sigma x.
+Proof. intros x Hx. apply (ex_derive_continuous (K:=R_AbsRing)(V:=R_NormedModule)).
+  exists (df x). apply Hd1; exact Hx. Qed.
+
+Lemma interp_pointwise_bound :
+  forall t, a <= t <= b ->
+    Rabs (sigma t - Lin sigma a b t) <= M2 / 2 * ((t - a) * (b - t)).
+Proof.
+  intros t Ht.
+  destruct (Rle_lt_dec t a) as [Hta|Hta].
+  - assert (t = a) by lra; subst t.
+    unfold Lin, slope. replace (sigma a - (sigma a + _ * (a - a))) with 0 by ring.
+    rewrite Rabs_R0. replace (a - a) with 0 by ring. rewrite Rmult_0_l, Rmult_0_r. lra.
+  - destruct (Rle_lt_dec b t) as [Htb|Htb].
+    + assert (t = b) by lra; subst t.
+      unfold Lin, slope.
+      replace (sigma b - (sigma a + (sigma b - sigma a)/(b-a)*(b-a))) with 0 by (field; lra).
+      rewrite Rabs_R0. replace (b - b) with 0 by ring. rewrite Rmult_0_r, Rmult_0_r. lra.
+    + destruct (divided_difference_mvt sigma df ddf a b Hab Hd1 Hd2 t (conj Hta Htb))
+        as [zeta [Hz Heq]].
+      rewrite Heq.
+      rewrite Rabs_mult.
+      assert (Hpar : Rabs ((t - a) * (t - b)) = (t - a) * (b - t)).
+      { rewrite Rabs_mult. rewrite (Rabs_right (t-a)) by lra.
+        rewrite (Rabs_left1 (t-b)) by lra. ring. }
+      rewrite Hpar.
+      apply Rmult_le_compat_r; [ nra |].
+      unfold Rdiv. rewrite Rabs_mult. rewrite (Rabs_right (/2)) by lra.
+      apply Rmult_le_compat_r; [lra|]. apply Hbnd. lra.
+Qed.
+End T3.
+
+Lemma Lin_continuous : forall sigma a b x, continuous (Lin sigma a b) x.
+Proof.
+  intros sigma a b x. unfold Lin.
+  apply (continuous_plus (V:=R_NormedModule) (fun _ => sigma a)
+           (fun t => slope sigma a b * (t - a)));
+    [apply continuous_const
+    | apply (continuous_mult (fun _ => slope sigma a b) (fun t => t - a));
+       [apply continuous_const
+       | apply (continuous_minus (V:=R_NormedModule) (fun t => t) (fun _ => a));
+          [apply continuous_id | apply continuous_const]]].
+Qed.
+
+Lemma RInt_Lin : forall sigma a b, a < b ->
+  RInt (Lin sigma a b) a b = (b - a) * (sigma a + sigma b) / 2.
+Proof.
+  intros sigma a b Hab.
+  apply is_RInt_unique.
+  replace ((b - a) * (sigma a + sigma b) / 2)
+    with ((sigma a * b + slope sigma a b * (b - a)^2 / 2)
+          - (sigma a * a + slope sigma a b * (a - a)^2 / 2))
+    by (unfold slope; field; lra).
+  apply (is_RInt_derive
+           (fun t => sigma a * t + slope sigma a b * (t - a)^2 / 2)
+           (Lin sigma a b) a b).
+  - intros x _. unfold Lin. auto_derive. trivial. nra.
+  - intros x _. apply Lin_continuous.
+Qed.
+
+Lemma ex_RInt_minus_R : forall (f g : R -> R) (a b : R),
+  ex_RInt f a b -> ex_RInt g a b -> ex_RInt (fun x => f x - g x) a b.
+Proof. intros f g a b Hf Hg. exact (ex_RInt_minus f g a b Hf Hg). Qed.
+
+Lemma cont_parabola : forall a b x, continuous (fun x => (x - a) * (b - x)) x.
+Proof.
+  intros a b x.
+  apply (continuous_mult (fun x => x-a) (fun x => b-x));
+    [apply (continuous_minus (V:=R_NormedModule) (fun t=>t)(fun _=>a));
+       [apply continuous_id|apply continuous_const]
+    |apply (continuous_minus (V:=R_NormedModule) (fun _=>b)(fun t=>t));
+       [apply continuous_const|apply continuous_id]].
+Qed.
+
+Theorem trapezoidal_panel_error :
+  forall sigma df ddf a b M2, a < b -> 0 <= M2 ->
+    (forall x, a <= x <= b -> is_derive sigma x (df x)) ->
+    (forall x, a <= x <= b -> is_derive df x (ddf x)) ->
+    (forall x, a <= x <= b -> Rabs (ddf x) <= M2) ->
+    Rabs (RInt sigma a b - (b - a) * (sigma a + sigma b) / 2)
+      <= M2 * (b - a)^3 / 12.
+Proof.
+  intros sigma df ddf a b M2 Hab HM2 Hd1 Hd2 Hbnd.
+  assert (Hexs : ex_RInt sigma a b).
+  { apply (ex_RInt_continuous (V:=R_CompleteNormedModule)). intros x Hx.
+    rewrite Rmin_left in Hx by lra. rewrite Rmax_right in Hx by lra.
+    apply (sigma_cont sigma df a b Hd1 x Hx). }
+  assert (HexL : ex_RInt (Lin sigma a b) a b).
+  { apply (ex_RInt_continuous (V:=R_CompleteNormedModule)). intros x _.
+    apply Lin_continuous. }
+  rewrite <- (RInt_Lin sigma a b Hab).
+  rewrite <- (RInt_minus_R sigma (Lin sigma a b) a b Hexs HexL).
+  assert (Hexd : ex_RInt (fun x => sigma x - Lin sigma a b x) a b)
+    by (apply ex_RInt_minus_R; assumption).
+  eapply Rle_trans;
+    [apply (abs_RInt_le (fun x => sigma x - Lin sigma a b x) a b
+              (Rlt_le _ _ Hab) Hexd) |].
+  assert (HexAbs : ex_RInt (fun x => Rabs (sigma x - Lin sigma a b x)) a b).
+  { apply (ex_RInt_continuous (V:=R_CompleteNormedModule)). intros x Hx.
+    rewrite Rmin_left in Hx by lra. rewrite Rmax_right in Hx by lra.
+    apply (continuous_comp (fun x => sigma x - Lin sigma a b x) Rabs).
+    - apply (continuous_minus (V:=R_NormedModule) sigma (Lin sigma a b)).
+      + apply (sigma_cont sigma df a b Hd1 x Hx).
+      + apply Lin_continuous.
+    - apply continuous_Rabs. }
+  assert (HexPar : ex_RInt (fun x => M2 / 2 * ((x - a) * (b - x))) a b).
+  { apply (ex_RInt_continuous (V:=R_CompleteNormedModule)). intros x _.
+    apply (continuous_mult (fun _ => M2/2) (fun x => (x-a)*(b-x)));
+      [apply continuous_const | apply cont_parabola]. }
+  eapply Rle_trans;
+    [apply (RInt_le (fun x => Rabs (sigma x - Lin sigma a b x))
+              (fun x => M2 / 2 * ((x - a) * (b - x))) a b (Rlt_le _ _ Hab)
+              HexAbs HexPar) |].
+  - intros x Hx.
+    apply (interp_pointwise_bound sigma df ddf a b M2 Hab Hd1 Hd2 Hbnd x). lra.
+  - rewrite (RInt_scal_R (fun x => (x - a) * (b - x)) a b (M2/2)).
+    + rewrite (RInt_parabola a b (Rlt_le _ _ Hab)). lra.
+    + apply (ex_RInt_continuous (V:=R_CompleteNormedModule)). intros x _.
+      apply cont_parabola.
+Qed.
+
 (* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
 Print Assumptions rolle_is_derive.
+Print Assumptions interp_segment_curvature_error_sharp.
+Print Assumptions RInt_parabola.
+Print Assumptions trapezoidal_panel_error.
 Print Assumptions interval_product_max.
 Print Assumptions divided_difference_mvt.
 Print Assumptions tight_curvature_bound.

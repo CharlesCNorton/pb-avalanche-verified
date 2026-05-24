@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fix workspace permissions for the Docker user
+        run: sudo chmod -R a+rwX "$GITHUB_WORKSPACE"
+
+      - name: Build and audit
+        uses: coq-community/docker-coq-action@v1
+        with:
+          coq_version: "9.0"
+          ocaml_version: "4.14-flambda"
+          custom_script: |
+            startGroup "Install Coquelicot"
+              opam install -y coq-coquelicot.3.4.4
+            endGroup
+            startGroup "Build"
+              make
+            endGroup
+            startGroup "Axiom audit"
+              make audit-check
+            endGroup
