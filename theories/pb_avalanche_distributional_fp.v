@@ -339,6 +339,150 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Exact delta-source identity for the slowing-down spectrum === *)
+(* ================================================================== *)
+
+(* Real-valued scalar pull-out for the Riemann integral. *)
+Lemma RInt_scal_R' :
+  forall (l : R) (f : R -> R) (a b : R),
+    ex_RInt f a b ->
+    RInt (fun x => l * f x) a b = l * RInt f a b.
+Proof.
+  intros l f a b Hf.
+  replace (l * RInt f a b) with (scal l (RInt f a b)) by reflexivity.
+  rewrite <- (RInt_scal (V := R_CompleteNormedModule) f a b l Hf).
+  apply RInt_ext. intros x _. reflexivity.
+Qed.
+
+Section SlowingDown.
+
+  Variables (a b E_birth S : R).
+  Variable tau : R -> R.
+  Hypothesis Ha_pos   : 0 < a.
+  Hypothesis Hbirth   : a < E_birth < b.
+  Hypothesis Htau_pos : forall E, 0 < tau E.
+
+  (* Energy-loss rate Edot(E) = -E/tau(E): particles drift downward. *)
+  Definition Edot_sd (E : R) : R := - E / tau E.
+
+  (* Slowing-down spectrum: constant downward flux S below the birth
+     energy, no particles above it. *)
+  Definition f_slowing (E : R) : R :=
+    if Rlt_dec E E_birth then S * tau E / E else 0.
+
+  (* The energy flux Edot*f is the constant -S below E_birth ... *)
+  Lemma flux_below : forall E, 0 < E -> E < E_birth ->
+    f_slowing E * Edot_sd E = - S.
+  Proof.
+    intros E HE Hlt. unfold f_slowing, Edot_sd.
+    destruct (Rlt_dec E E_birth) as [_|Hn]; [| lra].
+    pose proof (Htau_pos E) as Ht. field; lra.
+  Qed.
+
+  (* ... and zero at and above E_birth. *)
+  Lemma flux_above : forall E, E_birth <= E ->
+    f_slowing E * Edot_sd E = 0.
+  Proof.
+    intros E Hge. unfold f_slowing.
+    destruct (Rlt_dec E E_birth) as [Hlt|_]; [ lra | ring ].
+  Qed.
+
+  (* phi' is continuous (it carries a second derivative phi''). *)
+  Lemma phi'_cont (phi_d : test_function a b) :
+    forall x, continuous (phi' phi_d) x.
+  Proof.
+    intro x.
+    apply (ex_derive_continuous (K := R_AbsRing) (V := R_NormedModule)).
+    exists (phi'' phi_d x). apply (phi'_is_derive phi_d).
+  Qed.
+
+  (* FTC for the test function: the integral of phi' is the increment
+     of phi. *)
+  Lemma RInt_phi' (phi_d : test_function a b) :
+    forall x y, RInt (phi' phi_d) x y = phi phi_d y - phi phi_d x.
+  Proof.
+    intros x y. apply is_RInt_unique.
+    replace (phi phi_d y - phi phi_d x)
+      with (minus (phi phi_d y) (phi phi_d x)) by reflexivity.
+    apply (is_RInt_derive (V := R_CompleteNormedModule)
+             (phi phi_d) (phi' phi_d)).
+    - intros t _. apply (phi_is_derive phi_d).
+    - intros t _. apply phi'_cont.
+  Qed.
+
+  (* The weak drift pairing of the slowing-down spectrum localises onto
+     the birth energy: it is exactly -S phi(E_birth). Equivalently the
+     strong drift operator -(Edot f)' is the point source
+     S delta(E - E_birth). The integral splits at E_birth where the flux
+     jumps from the constant -S to 0, and integral_a^{Eb} phi' is
+     phi(E_birth) - phi(a) with phi(a) = 0. *)
+  Theorem slowing_down_delta_source :
+    forall (phi_d : test_function a b),
+      weak_FP_drift f_slowing Edot_sd phi_d = - S * phi phi_d E_birth.
+  Proof.
+    intros phi_d. unfold weak_FP_drift.
+    transitivity
+      (RInt (fun E => (f_slowing E * Edot_sd E) * phi' phi_d E) a b).
+    { apply RInt_ext. intros E _. lra. }
+    destruct (test_boundary_a a b phi_d) as [Hpa _].
+    assert (HexL : ex_RInt (V := R_CompleteNormedModule)
+      (fun E => (f_slowing E * Edot_sd E) * phi' phi_d E) a E_birth).
+    { apply (ex_RInt_ext (fun E => - S * phi' phi_d E)).
+      - intros x Hx. rewrite Rmin_left in Hx by lra.
+        rewrite Rmax_right in Hx by lra.
+        rewrite (flux_below x); [ lra | lra | lra ].
+      - apply (ex_RInt_continuous (V := R_CompleteNormedModule)).
+        intros z _. apply (continuous_mult_R (fun _ => - S) (phi' phi_d));
+          [ apply continuous_const | apply phi'_cont ]. }
+    assert (HexR : ex_RInt (V := R_CompleteNormedModule)
+      (fun E => (f_slowing E * Edot_sd E) * phi' phi_d E) E_birth b).
+    { apply (ex_RInt_ext (fun _ => 0)).
+      - intros x Hx. rewrite Rmin_left in Hx by lra.
+        rewrite Rmax_right in Hx by lra.
+        rewrite (flux_above x); [ lra | lra ].
+      - apply ex_RInt_const. }
+    assert (HexPhi' : ex_RInt (V := R_CompleteNormedModule)
+      (phi' phi_d) a E_birth).
+    { apply (ex_RInt_continuous (V := R_CompleteNormedModule)).
+      intros z _. apply phi'_cont. }
+    rewrite <- (RInt_Chasles (V := R_CompleteNormedModule)
+                  (fun E => (f_slowing E * Edot_sd E) * phi' phi_d E)
+                  a E_birth b HexL HexR).
+    unfold plus; simpl.
+    assert (HR0 :
+      RInt (fun E => (f_slowing E * Edot_sd E) * phi' phi_d E) E_birth b = 0).
+    { rewrite (RInt_ext _ (fun _ => 0)).
+      - rewrite RInt_const. unfold scal; simpl; unfold mult; simpl. lra.
+      - intros x Hx. rewrite Rmin_left in Hx by lra.
+        rewrite Rmax_right in Hx by lra.
+        rewrite (flux_above x); [ lra | lra ]. }
+    assert (HLext :
+      RInt (fun E => (f_slowing E * Edot_sd E) * phi' phi_d E) a E_birth
+      = RInt (fun E => - S * phi' phi_d E) a E_birth).
+    { apply RInt_ext. intros x Hx. rewrite Rmin_left in Hx by lra.
+      rewrite Rmax_right in Hx by lra.
+      rewrite (flux_below x); [ lra | lra | lra ]. }
+    assert (HL :
+      RInt (fun E => (f_slowing E * Edot_sd E) * phi' phi_d E) a E_birth
+      = - S * (phi phi_d E_birth - phi phi_d a)).
+    { rewrite HLext.
+      rewrite (RInt_scal_R' (- S) (phi' phi_d) a E_birth HexPhi').
+      rewrite (RInt_phi' phi_d a E_birth). reflexivity. }
+    rewrite HR0, HL, Hpa. lra.
+  Qed.
+
+  (* Source-balanced steady state: the weak drift of the slowing-down
+     spectrum is cancelled by the S delta(E - E_birth) injection. *)
+  Corollary slowing_down_steady_state :
+    forall (phi_d : test_function a b),
+      weak_FP_drift f_slowing Edot_sd phi_d + S * phi phi_d E_birth = 0.
+  Proof.
+    intros phi_d. rewrite slowing_down_delta_source. lra.
+  Qed.
+
+End SlowingDown.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
@@ -350,3 +494,5 @@ Print Assumptions weak_FP_zero.
 Print Assumptions weak_FP_drift_linear_in_f.
 Print Assumptions integration_by_parts_test.
 Print Assumptions weak_derivative_adjoint.
+Print Assumptions slowing_down_delta_source.
+Print Assumptions slowing_down_steady_state.
