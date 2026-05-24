@@ -254,6 +254,100 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Maxwellian thermal average: the sqrt(T) bremsstrahlung law === *)
+(* ================================================================== *)
+
+Lemma RInt_scal_R : forall (f : R -> R) (a b k : R),
+  ex_RInt f a b -> RInt (fun x => k * f x) a b = k * RInt f a b.
+Proof.
+  intros f a b k Hf. pose proof (RInt_scal f a b k Hf) as H.
+  unfold scal in H; simpl in H; unfold mult in H; simpl in H. exact H.
+Qed.
+
+Lemma thermal_moment_scaling :
+  forall (p : nat) (T c : R), 0 < T ->
+    ex_RInt (fun u => u ^ p * exp (- u ^ 2 / 2)) 0 c ->
+    ex_RInt (fun v => v ^ p * exp (- v ^ 2 / (2 * T))) 0 (sqrt T * c) ->
+    RInt (fun v => v ^ p * exp (- v ^ 2 / (2 * T))) 0 (sqrt T * c)
+    = sqrt T ^ (p + 1) * RInt (fun u => u ^ p * exp (- u ^ 2 / 2)) 0 c.
+Proof.
+  intros p T c HT Hex Hexf0.
+  assert (HsT : 0 < sqrt T) by (apply sqrt_lt_R0; exact HT).
+  assert (HsT2 : sqrt T * sqrt T = T) by (apply sqrt_sqrt; lra).
+  set (f := fun v => v ^ p * exp (- v ^ 2 / (2 * T))).
+  assert (Hexf : ex_RInt f (sqrt T * 0 + 0) (sqrt T * c + 0)).
+  { replace (sqrt T * 0 + 0) with 0 by ring.
+    replace (sqrt T * c + 0) with (sqrt T * c) by ring. exact Hexf0. }
+  pose proof (RInt_comp_lin f (sqrt T) 0 0 c Hexf) as Hcl.
+  replace (sqrt T * 0 + 0) with 0 in Hcl by ring.
+  replace (sqrt T * c + 0) with (sqrt T * c) in Hcl by ring.
+  rewrite <- Hcl.
+  transitivity (RInt (fun y => sqrt T ^ (p+1) * (y ^ p * exp (- y^2/2))) 0 c).
+  - apply RInt_ext. intros y _.
+    change (scal (sqrt T) (f (sqrt T * y + 0)))
+      with (sqrt T * f (sqrt T * y + 0)).
+    unfold f.
+    replace (sqrt T * y + 0) with (sqrt T * y) by ring.
+    assert (HsTp : (sqrt T) ^ 2 = T).
+    { replace ((sqrt T)^2) with (sqrt T * sqrt T) by ring. exact HsT2. }
+    assert (Hexparg : - (sqrt T * y) ^ 2 / (2 * T) = - y ^ 2 / 2).
+    { rewrite Rpow_mult_distr. rewrite HsTp. field. lra. }
+    rewrite Hexparg.
+    rewrite Rpow_mult_distr.
+    rewrite (pow_add (sqrt T) p 1). rewrite pow_1.
+    set (A := sqrt T ^ p). set (B := y ^ p). set (E := exp (- y ^ 2 / 2)).
+    change (@eq R (sqrt T * (A * B * E)) (A * sqrt T * (B * E))).
+    ring.
+  - apply RInt_scal_R. exact Hex.
+Qed.
+
+(* The thermal mean speed scales as sqrt(T): the numerator moment
+   (p=3) scales as T^2, the normalization (p=2) as T^{3/2}, ratio sqrt(T). *)
+Theorem thermal_mean_speed_sqrtT :
+  forall (c : R), 0 < c ->
+    ex_RInt (fun u => u ^ 3 * exp (- u ^ 2 / 2)) 0 c ->
+    ex_RInt (fun u => u ^ 2 * exp (- u ^ 2 / 2)) 0 c ->
+    (forall T, 0 < T ->
+       ex_RInt (fun v => v ^ 3 * exp (- v ^ 2 / (2*T))) 0 (sqrt T * c)) ->
+    (forall T, 0 < T ->
+       ex_RInt (fun v => v ^ 2 * exp (- v ^ 2 / (2*T))) 0 (sqrt T * c)) ->
+    0 < RInt (fun u => u ^ 2 * exp (- u ^ 2 / 2)) 0 c ->
+    forall T, 0 < T ->
+      RInt (fun v => v ^ 3 * exp (- v ^ 2 / (2*T))) 0 (sqrt T * c)
+      / RInt (fun v => v ^ 2 * exp (- v ^ 2 / (2*T))) 0 (sqrt T * c)
+      = sqrt T *
+        (RInt (fun u => u ^ 3 * exp (- u ^ 2 / 2)) 0 c
+         / RInt (fun u => u ^ 2 * exp (- u ^ 2 / 2)) 0 c).
+Proof.
+  intros c Hc Hex3 Hex2 Hexf3 Hexf2 Hnorm T HT.
+  assert (HsT : 0 < sqrt T) by (apply sqrt_lt_R0; exact HT).
+  rewrite (thermal_moment_scaling 3 T c HT Hex3 (Hexf3 T HT)).
+  rewrite (thermal_moment_scaling 2 T c HT Hex2 (Hexf2 T HT)).
+  set (N3 := RInt (fun u => u ^ 3 * exp (- u ^ 2 / 2)) 0 c).
+  set (N2 := RInt (fun u => u ^ 2 * exp (- u ^ 2 / 2)) 0 c).
+  assert (HsTne : sqrt T <> 0) by lra.
+  assert (HN2 : N2 <> 0) by (apply Rgt_not_eq; exact Hnorm).
+  assert (HsT3 : sqrt T ^ 3 <> 0) by (apply pow_nonzero; exact HsTne).
+  simpl (3 + 1)%nat. simpl (2 + 1)%nat.
+  field. split; assumption.
+Qed.
+
+(* The 1/omega bremsstrahlung spectrum integrated against the photon
+   energy gives a radiated power per collision linear in E:
+   integral_0^E omega * (kappa/omega) d omega = kappa * E. *)
+Lemma brems_spectral_power : forall (kappa E : R), 0 < E ->
+  RInt (fun w => w * (kappa / w)) 0 E = kappa * E.
+Proof.
+  intros kappa E HE.
+  rewrite (RInt_ext (fun w => w * (kappa / w)) (fun _ => kappa)).
+  - rewrite RInt_const. unfold scal; simpl; unfold mult; simpl. lra.
+  - intros x Hx. rewrite Rmin_left in Hx by lra.
+    rewrite Rmax_right in Hx by lra.
+    change (@eq R (x * (kappa / x)) kappa). field. lra.
+Qed.
+
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
@@ -263,3 +357,6 @@ Print Assumptions relativistic_NR_agree_first_order.
 Print Assumptions relativistic_speed_suppressed.
 Print Assumptions relativistic_correction_le_1.
 Print Assumptions bremsstrahlung_rel_le_NR.
+Print Assumptions thermal_moment_scaling.
+Print Assumptions thermal_mean_speed_sqrtT.
+Print Assumptions brems_spectral_power.
