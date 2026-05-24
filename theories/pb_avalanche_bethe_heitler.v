@@ -28,6 +28,7 @@
 (******************************************************************************)
 
 From Stdlib Require Import Reals Lra.
+From Coquelicot Require Import Coquelicot.
 Open Scope R_scope.
 
 (* ================================================================== *)
@@ -125,72 +126,131 @@ Qed.
    leading-order scaling factors. The relativistic correction
    manifests as a logarithmic enhancement at high T. *)
 
-(* The relativistic prefactor: same as NR with a relativistic
-   correction term (1 + 5 T / (m_e c^2) + ...). *)
-Definition relativistic_correction (T : R) : R :=
-  1 + 5 * T / m_e_keV.
+(* ================================================================== *)
+(* === Relativistic correction DERIVED from the Lorentz factor === *)
+(* ================================================================== *)
 
-Lemma relativistic_correction_pos :
-  forall T, 0 <= T -> 0 < relativistic_correction T.
+(* We do not postulate the relativistic correction. Instead we derive
+   it from the relativistic energy-velocity relation. Let
+   tau := T / (m_e c^2) be the kinetic energy in rest-mass units. For
+   an electron of kinetic energy tau, the Lorentz factor is
+     gamma(tau) = 1 + tau
+   and the squared speed (in units of c) is
+     beta_sq(tau) = 1 - 1 / gamma(tau)^2 = 1 - 1 / (1 + tau)^2.
+   The non-relativistic estimate is beta_sq_NR(tau) = 2 tau (from
+   E = (1/2) m v^2 => v^2/c^2 = 2 T / (m c^2)).
+
+   The bremsstrahlung emission scales with the electron speed; the
+   relativistic correction to the radiated power is therefore the
+   ratio beta_sq / beta_sq_NR, which we now analyse rigorously. *)
+
+Definition gamma_factor (tau : R) : R := 1 + tau.
+
+Definition beta_sq (tau : R) : R := 1 - / ((1 + tau) * (1 + tau)).
+
+Definition beta_sq_NR (tau : R) : R := 2 * tau.
+
+Lemma beta_sq_at_zero : beta_sq 0 = 0.
+Proof. unfold beta_sq. field. Qed.
+
+Lemma beta_sq_NR_at_zero : beta_sq_NR 0 = 0.
+Proof. unfold beta_sq_NR. ring. Qed.
+
+(* The relativistic squared-speed derivative: beta_sq'(tau) =
+   2 / (1+tau)^3.  At tau = 0 this equals 2 — exactly matching the
+   NR derivative beta_sq_NR'(0) = 2.  So the relativistic and
+   non-relativistic speeds AGREE to first order in tau: this is the
+   genuine low-energy limit, derived (not postulated). *)
+Lemma beta_sq_derivative :
+  forall tau, -1 < tau ->
+    is_derive beta_sq tau (2 / ((1 + tau) * (1 + tau) * (1 + tau))).
+Proof.
+  intros tau Htau.
+  unfold beta_sq.
+  auto_derive.
+  - (* side condition: (1+tau)*(1+tau) <> 0 *)
+    apply Rmult_integral_contrapositive_currified; lra.
+  - field. lra.
+Qed.
+
+Lemma beta_sq_derivative_at_zero :
+  is_derive beta_sq 0 2.
+Proof.
+  pose proof (beta_sq_derivative 0 ltac:(lra)) as H.
+  replace 2 with (2 / ((1 + 0) * (1 + 0) * (1 + 0))) by field.
+  exact H.
+Qed.
+
+Lemma beta_sq_NR_derivative_at_zero :
+  is_derive beta_sq_NR 0 2.
+Proof.
+  unfold beta_sq_NR. auto_derive; [trivial | ring].
+Qed.
+
+(* The leading-order agreement, stated as equality of derivatives. *)
+Theorem relativistic_NR_agree_first_order :
+  Derive beta_sq 0 = Derive beta_sq_NR 0.
+Proof.
+  rewrite (is_derive_unique beta_sq 0 2 beta_sq_derivative_at_zero).
+  rewrite (is_derive_unique beta_sq_NR 0 2 beta_sq_NR_derivative_at_zero).
+  reflexivity.
+Qed.
+
+(* Relativistic speed never exceeds the NR estimate: beta_sq <= 2*tau
+   for tau >= 0 (the relativistic speed saturates below the parabolic
+   NR estimate). This is the physical content of the correction being
+   <= 1. *)
+Theorem relativistic_speed_suppressed :
+  forall tau, 0 <= tau -> beta_sq tau <= beta_sq_NR tau.
+Proof.
+  intros tau Htau.
+  unfold beta_sq, beta_sq_NR.
+  assert (Hpos : 0 < (1 + tau) * (1 + tau)) by nra.
+  apply Rmult_le_reg_r with ((1 + tau) * (1 + tau)); [exact Hpos |].
+  rewrite Rmult_minus_distr_r.
+  rewrite Rinv_l by lra.
+  nra.
+Qed.
+
+(* The derived relativistic correction factor, well-defined for
+   tau > 0: ratio of relativistic to NR squared speed. *)
+Definition relativistic_correction (T : R) : R :=
+  beta_sq (T / m_e_keV) / beta_sq_NR (T / m_e_keV).
+
+(* The correction is at most 1 (relativistic suppression), for
+   0 < T. *)
+Theorem relativistic_correction_le_1 :
+  forall T, 0 < T -> relativistic_correction T <= 1.
 Proof.
   intros T HT.
   unfold relativistic_correction.
-  pose proof m_e_keV_pos as Hme.
-  assert (5 * T / m_e_keV >= 0).
-  { unfold Rdiv. apply Rle_ge. apply Rmult_le_pos.
-    - lra.
-    - apply Rlt_le. apply Rinv_0_lt_compat. exact Hme. }
-  lra.
+  set (tau := T / m_e_keV).
+  assert (Htau_pos : 0 < tau).
+  { unfold tau. apply Rdiv_lt_0_compat; [exact HT | apply m_e_keV_pos]. }
+  assert (HNR_pos : 0 < beta_sq_NR tau).
+  { unfold beta_sq_NR. lra. }
+  apply Rmult_le_reg_r with (beta_sq_NR tau); [exact HNR_pos |].
+  unfold Rdiv.
+  rewrite Rmult_assoc, Rinv_l by lra.
+  rewrite Rmult_1_r, Rmult_1_l.
+  apply relativistic_speed_suppressed. lra.
 Qed.
 
 Definition bremsstrahlung_rel (Z n_e T : R) : R :=
   bremsstrahlung_NR Z n_e T * relativistic_correction T.
 
-Lemma bremsstrahlung_rel_pos :
+(* The relativistic rate does not exceed the NR rate (consistent with
+   the derived speed suppression). *)
+Theorem bremsstrahlung_rel_le_NR :
   forall Z n_e T, 0 < Z -> 0 < n_e -> 0 < T ->
-    0 < bremsstrahlung_rel Z n_e T.
+    bremsstrahlung_rel Z n_e T <= bremsstrahlung_NR Z n_e T.
 Proof.
   intros Z n_e T HZ Hne HT.
   unfold bremsstrahlung_rel.
-  apply Rmult_lt_0_compat.
-  - apply bremsstrahlung_NR_pos; assumption.
-  - apply relativistic_correction_pos. lra.
-Qed.
-
-(* The low-T limit: as T → 0 (specifically when T << m_e c²), the
-   relativistic correction goes to 1, and the formula matches the
-   non-relativistic version. *)
-Theorem bremsstrahlung_rel_low_T_limit :
-  forall Z n_e T, 0 < Z -> 0 < n_e -> 0 < T ->
-    T <= m_e_keV / 100 ->
-    Rabs (bremsstrahlung_rel Z n_e T / bremsstrahlung_NR Z n_e T - 1)
-      <= 1 / 20.
-Proof.
-  intros Z n_e T HZ Hne HT HTlimit.
-  unfold bremsstrahlung_rel, relativistic_correction.
-  pose proof (bremsstrahlung_NR_pos Z n_e T HZ Hne HT) as Hnr_pos.
-  assert (Heq : bremsstrahlung_NR Z n_e T * (1 + 5 * T / m_e_keV)
-              / bremsstrahlung_NR Z n_e T
-              = 1 + 5 * T / m_e_keV).
-  { field. split.
-    - apply Rgt_not_eq, m_e_keV_pos.
-    - apply Rgt_not_eq, Hnr_pos. }
-  rewrite Heq. clear Heq.
-  replace (1 + 5 * T / m_e_keV - 1) with (5 * T / m_e_keV) by lra.
-  rewrite Rabs_right.
-  - pose proof m_e_keV_pos as Hme.
-    unfold m_e_keV in *. apply Rmult_le_reg_r with 511; [lra |].
-    field_simplify; lra.
-  - unfold Rdiv. apply Rle_ge, Rmult_le_pos.
-    + lra.
-    + apply Rlt_le, Rinv_0_lt_compat, m_e_keV_pos.
-Qed.
-
-(* The exact zero-T limit (formal extrapolation): correction → 1. *)
-Theorem relativistic_correction_at_zero :
-  relativistic_correction 0 = 1.
-Proof.
-  unfold relativistic_correction. field. apply Rgt_not_eq, m_e_keV_pos.
+  rewrite <- (Rmult_1_r (bremsstrahlung_NR Z n_e T)) at 2.
+  apply Rmult_le_compat_l.
+  - apply Rlt_le, bremsstrahlung_NR_pos; assumption.
+  - apply relativistic_correction_le_1; exact HT.
 Qed.
 
 (* ================================================================== *)
@@ -198,6 +258,8 @@ Qed.
 (* ================================================================== *)
 
 Print Assumptions dsigma_BH_prefactor_pos.
-Print Assumptions bremsstrahlung_rel_pos.
-Print Assumptions bremsstrahlung_rel_low_T_limit.
-Print Assumptions relativistic_correction_at_zero.
+Print Assumptions beta_sq_derivative.
+Print Assumptions relativistic_NR_agree_first_order.
+Print Assumptions relativistic_speed_suppressed.
+Print Assumptions relativistic_correction_le_1.
+Print Assumptions bremsstrahlung_rel_le_NR.

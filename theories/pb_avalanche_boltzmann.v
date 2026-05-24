@@ -179,10 +179,149 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Real-valued RInt bridge helpers === *)
+(* ================================================================== *)
+
+Lemma RInt_scal_R :
+  forall (f : R -> R) (a b k : R),
+    ex_RInt f a b ->
+    RInt (fun x => k * f x) a b = k * RInt f a b.
+Proof.
+  intros f a b k Hf.
+  pose proof (RInt_scal f a b k Hf) as H.
+  unfold scal in H; simpl in H; unfold mult in H; simpl in H. exact H.
+Qed.
+
+Lemma ex_RInt_minus_R :
+  forall (f g : R -> R) (a b : R),
+    ex_RInt f a b -> ex_RInt g a b -> ex_RInt (fun x => f x - g x) a b.
+Proof.
+  intros f g a b Hf Hg.
+  exact (ex_RInt_minus f g a b Hf Hg).
+Qed.
+
+Lemma RInt_minus_R :
+  forall (f g : R -> R) (a b : R),
+    ex_RInt f a b -> ex_RInt g a b ->
+    RInt (fun x => f x - g x) a b = RInt f a b - RInt g a b.
+Proof.
+  intros f g a b Hf Hg.
+  pose proof (RInt_minus f g a b Hf Hg) as H.
+  unfold minus in H; simpl in H; unfold plus, opp in H; simpl in H.
+  exact H.
+Qed.
+
+(* ================================================================== *)
+(* === The BGK collision operator (a genuine Boltzmann model) === *)
+(* ================================================================== *)
+
+(* The Bhatnagar-Gross-Krook relaxation collision operator
+     C[f](v) := (f_eq(v) - f(v)) / tau
+   is the standard tractable model of the full Boltzmann collision
+   integral: it relaxes the distribution toward the local Maxwellian
+   f_eq at rate 1/tau while conserving the collision invariants
+   (mass, momentum, energy) provided f_eq shares those moments with f.
+   It is widely used in transport theory precisely because it captures
+   the qualitative content of the 9-D collision integral without the
+   intractable phase-space integration. *)
+Definition bgk_collision (f_eq f : R -> R) (tau v : R) : R :=
+  / tau * (f_eq v - f v).
+
+(* === Mass conservation ===
+   The zeroth moment of C[f] is (N_eq - N) / tau, which vanishes
+   exactly when the Maxwellian f_eq is normalised to the same particle
+   number as f. This is the conservation of mass under collisions. *)
+Theorem bgk_mass_conservation :
+  forall (f_eq f : R -> R) (tau v_min v_max : R),
+    0 < tau ->
+    ex_RInt f_eq v_min v_max ->
+    ex_RInt f v_min v_max ->
+    RInt (fun v => bgk_collision f_eq f tau v) v_min v_max
+    = (RInt f_eq v_min v_max - RInt f v_min v_max) / tau.
+Proof.
+  intros f_eq f tau v_min v_max Htau Hex_eq Hex_f.
+  unfold bgk_collision.
+  rewrite (RInt_scal_R (fun v => f_eq v - f v) v_min v_max (/ tau)
+             (ex_RInt_minus_R f_eq f v_min v_max Hex_eq Hex_f)).
+  rewrite (RInt_minus_R f_eq f v_min v_max Hex_eq Hex_f).
+  unfold Rdiv. apply Rmult_comm.
+Qed.
+
+(* When the equilibrium shares the particle number of f, the net
+   collisional mass change is exactly zero. *)
+Corollary bgk_mass_conserved_when_matched :
+  forall (f_eq f : R -> R) (tau v_min v_max : R),
+    0 < tau ->
+    ex_RInt f_eq v_min v_max ->
+    ex_RInt f v_min v_max ->
+    RInt f_eq v_min v_max = RInt f v_min v_max ->
+    RInt (fun v => bgk_collision f_eq f tau v) v_min v_max = 0.
+Proof.
+  intros f_eq f tau v_min v_max Htau Hex_eq Hex_f Hmatch.
+  rewrite (bgk_mass_conservation f_eq f tau v_min v_max Htau Hex_eq Hex_f).
+  rewrite Hmatch.
+  assert (Hz : RInt f v_min v_max - RInt f v_min v_max = 0) by lra.
+  rewrite Hz. unfold Rdiv. apply Rmult_0_l.
+Qed.
+
+(* === BGK relaxation dynamics ===
+   At each velocity v the BGK equation df/dt = (f_eq - f)/tau is a
+   scalar linear ODE whose solution is
+     f(t) = f_eq + (f0 - f_eq) * exp(-t/tau).
+   We verify it solves the ODE exactly, and that the deviation from
+   equilibrium decays monotonically — the BGK H-theorem in miniature. *)
+Definition bgk_relax (f_eq f0 tau t : R) : R :=
+  f_eq + (f0 - f_eq) * exp (- t / tau).
+
+Theorem bgk_relax_solves_ode :
+  forall f_eq f0 tau t, 0 < tau ->
+    is_derive (bgk_relax f_eq f0 tau) t
+              ((f_eq - bgk_relax f_eq f0 tau t) / tau).
+Proof.
+  intros f_eq f0 tau t Htau.
+  unfold bgk_relax.
+  auto_derive; [lra |].
+  assert (Htau_ne : tau <> 0) by lra.
+  replace (- t / tau) with (- t * / tau) by (unfold Rdiv; reflexivity).
+  field. exact Htau_ne.
+Qed.
+
+(* The deviation |f(t) - f_eq| relaxes: it equals |f0 - f_eq| * exp(-t/tau),
+   strictly decreasing toward 0. *)
+Theorem bgk_deviation_decays :
+  forall f_eq f0 tau t1 t2, 0 < tau -> 0 <= t1 <= t2 ->
+    Rabs (bgk_relax f_eq f0 tau t2 - f_eq)
+    <= Rabs (bgk_relax f_eq f0 tau t1 - f_eq).
+Proof.
+  intros f_eq f0 tau t1 t2 Htau [Ht1 Ht12].
+  unfold bgk_relax.
+  replace (f_eq + (f0 - f_eq) * exp (- t2 / tau) - f_eq)
+    with ((f0 - f_eq) * exp (- t2 / tau)) by ring.
+  replace (f_eq + (f0 - f_eq) * exp (- t1 / tau) - f_eq)
+    with ((f0 - f_eq) * exp (- t1 / tau)) by ring.
+  rewrite !Rabs_mult.
+  apply Rmult_le_compat_l; [apply Rabs_pos |].
+  rewrite !(Rabs_right (exp _)) by (apply Rle_ge, Rlt_le, exp_pos).
+  destruct (Req_dec t1 t2) as [Heq | Hne].
+  - subst. apply Rle_refl.
+  - apply Rlt_le. apply exp_increasing.
+    assert (Ht1lt2 : t1 < t2) by lra.
+    apply Rmult_lt_gt_compat_neg_l with (r := -1) in Ht1lt2; [|lra].
+    unfold Rdiv.
+    apply Rmult_lt_compat_r with (r := / tau) in Ht1lt2;
+      [|apply Rinv_0_lt_compat; exact Htau].
+    lra.
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
 Print Assumptions mass_moment_nonneg.
+Print Assumptions bgk_mass_conservation.
+Print Assumptions bgk_mass_conserved_when_matched.
+Print Assumptions bgk_relax_solves_ode.
+Print Assumptions bgk_deviation_decays.
 Print Assumptions f_slowing_pos.
 Print Assumptions f_slowing_decreasing.
 Print Assumptions energy_moment_slowing.
