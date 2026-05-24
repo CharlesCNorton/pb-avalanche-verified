@@ -158,6 +158,116 @@ Section PicardIterates.
 End PicardIterates.
 
 (* ================================================================== *)
+(* === The general Picard fixed-point operator === *)
+(* ================================================================== *)
+
+(* The genuine Picard iteration operator: not hardcoded polynomials,
+   but the actual fixed-point recursion
+     y_{n+1}(t) = y0 + integral_{t0}^{t} F(y_n(s)) ds.
+   We instantiate F to the affine ash right-hand side and PROVE that
+   the abstract iterates collapse to the closed-form polynomials
+   picard_iter_1, picard_iter_2 — i.e. the general operator really does
+   generate the Taylor partial sums of the exponential solution. *)
+
+(* Closed form for the affine integral, via the fundamental theorem of
+   calculus with antiderivative c0*s - c1*(s^2/2). *)
+Lemma RInt_affine : forall (c0 c1 t : R),
+  RInt (fun s => c0 - c1 * s) 0 t = c0 * t - c1 * (t * t / 2).
+Proof.
+  intros c0 c1 t.
+  apply is_RInt_unique.
+  replace (c0 * t - c1 * (t * t / 2))
+    with ((c0 * t - c1 * (t * t / 2)) - (c0 * 0 - c1 * (0 * 0 / 2))) by field.
+  apply (is_RInt_derive (fun s => c0 * s - c1 * (s * s / 2))
+                        (fun s => c0 - c1 * s) 0 t).
+  - intros x _. auto_derive. trivial. field.
+  - intros x _.
+    apply (continuous_minus (V := R_NormedModule) (fun _ => c0) (fun s => c1 * s)).
+    + apply continuous_const.
+    + apply (continuous_mult (fun _ => c1) (fun s => s));
+        [apply continuous_const | apply continuous_id].
+Qed.
+
+Section GeneralPicard.
+
+  Variable R_primary tau_ash : R.
+  Hypothesis tau_pos : 0 < tau_ash.
+
+  Definition Faff (y : R) : R := R_primary - y / tau_ash.
+
+  Fixpoint picard (y0 t0 : R) (n : nat) (t : R) : R :=
+    match n with
+    | 0%nat => y0
+    | S k => y0 + RInt (fun s => Faff (picard y0 t0 k s)) t0 t
+    end.
+
+  (* Helper: integral of the identity on [0, t]. *)
+  Lemma RInt_id_0t : forall t, RInt (fun s => s) 0 t = t * t / 2.
+  Proof.
+    intros t.
+    apply is_RInt_unique.
+    replace (t * t / 2) with (t * t / 2 - 0 * 0 / 2) by field.
+    apply (is_RInt_derive (fun s => s * s / 2) (fun s => s) 0 t).
+    - intros x _. auto_derive; [trivial | field].
+    - intros x _.
+      apply (continuous_id x).
+  Qed.
+
+  (* Iterate 0 is the initial value. *)
+  Lemma picard_step0 : forall t, picard 0 0 0 t = 0.
+  Proof. intros t. reflexivity. Qed.
+
+  (* Iterate 1 equals the closed-form first Picard polynomial. *)
+  Theorem picard_step1 :
+    forall t, picard 0 0 1 t = R_primary * t.
+  Proof.
+    intros t.
+    simpl (picard 0 0 1 t).
+    transitivity (0 + RInt (fun _ : R => R_primary) 0 t).
+    { f_equal. apply RInt_ext. intros s _.
+      unfold Faff. simpl. field. lra. }
+    rewrite RInt_const. unfold scal; simpl; unfold mult; simpl. lra.
+  Qed.
+
+  (* Iterate 2 equals the closed-form second Picard polynomial
+     R_primary*t - R_primary*t^2/(2*tau). *)
+  Theorem picard_step2 :
+    forall t,
+      picard 0 0 2 t
+      = R_primary * t - R_primary * (t * t) / (2 * tau_ash).
+  Proof.
+    intros t.
+    replace (picard 0 0 2 t)
+      with (0 + RInt (fun s => Faff (picard 0 0 1 s)) 0 t)
+      by reflexivity.
+    (* integrand = Faff (picard 0 0 1 s) = R_primary - (R_primary*s)/tau.
+       Compute the integral directly via the fundamental theorem of
+       calculus with the explicit antiderivative
+         F(s) = R_primary*s - R_primary/tau_ash * (s*s/2). *)
+    transitivity
+      (0 + RInt (fun s => R_primary - R_primary / tau_ash * s) 0 t).
+    { f_equal. apply RInt_ext. intros s _.
+      rewrite picard_step1. unfold Faff, Rdiv. lra. }
+    rewrite Rplus_0_l.
+    rewrite (RInt_affine R_primary (R_primary / tau_ash) t).
+    field. lra.
+  Qed.
+
+  (* The abstract iterates match the hardcoded closed forms, so the
+     general Picard operator genuinely produces them. *)
+  Theorem picard_matches_closed_forms :
+    forall t,
+      picard 0 0 1 t = picard_iter_1 R_primary t
+      /\ picard 0 0 2 t = picard_iter_2 R_primary tau_ash t.
+  Proof.
+    intros t. split.
+    - rewrite picard_step1. unfold picard_iter_1. reflexivity.
+    - rewrite picard_step2. unfold picard_iter_2. field. lra.
+  Qed.
+
+End GeneralPicard.
+
+(* ================================================================== *)
 (* === Composition with M_ash_decreasing === *)
 (* ================================================================== *)
 
@@ -207,5 +317,8 @@ Qed.
 Print Assumptions n_ash_solution_satisfies_ODE.
 Print Assumptions n_ash_solution_at_0.
 Print Assumptions picard_iter_1_is_source_integral.
+Print Assumptions picard_step1.
+Print Assumptions picard_step2.
+Print Assumptions picard_matches_closed_forms.
 Print Assumptions n_ash_solution_nonneg.
 Print Assumptions n_ash_solution_bounded_by_eq.

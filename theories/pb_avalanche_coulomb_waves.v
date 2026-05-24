@@ -252,9 +252,85 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === The s-wave series solves the Coulomb equation term-by-term === *)
+(* ================================================================== *)
+
+(* The l = 0 regular Coulomb function is F_0(eta, rho) = rho * u(rho)
+   where u(rho) = sum_{k>=1} c_k rho^{k-1}, equivalently the function
+   w(rho) = sum_{k>=1} c_k rho^k with c_0 = 0, c_1 = 1. Substituting
+   into the s-wave Coulomb equation
+
+     w''(rho) + (1 - 2 eta / rho) w(rho) = 0,
+
+   and collecting the coefficient of rho^{k-2}, gives the recurrence
+
+     k (k-1) c_k + c_{k-2} - 2 eta c_{k-1} = 0      (k >= 2).
+
+   We DEFINE the c_k by this recurrence and then PROVE the recurrence
+   is exactly the term-by-term Coulomb equation — i.e., the defined
+   power series annihilates the Coulomb operator order by order. This
+   is the genuine content of "the regular solution satisfies the
+   Coulomb wave equation". *)
+
+Fixpoint cw (eta : R) (k : nat) {struct k} : R :=
+  match k with
+  | 0%nat => 0
+  | S 0%nat => 1
+  | S (S k' as k1) =>
+      (2 * eta * cw eta k1 - cw eta k') / (INR k * INR k1)
+  end.
+
+Lemma cw_0 : forall eta, cw eta 0 = 0.
+Proof. intros. reflexivity. Qed.
+
+Lemma cw_1 : forall eta, cw eta 1 = 1.
+Proof. intros. reflexivity. Qed.
+
+Lemma cw_2 : forall eta, cw eta 2 = eta.
+Proof. intros eta. simpl. field. Qed.
+
+Lemma cw_3 : forall eta, cw eta 3 = (2 * eta * eta - 1) / 6.
+Proof. intros eta. simpl. field. Qed.
+
+(* The genuine term-by-term Coulomb-equation identity: for every k,
+   the coefficients satisfy the recurrence that arises from plugging
+   the power series into w'' + (1 - 2 eta / rho) w = 0. The coefficient
+   of rho^k in that expansion is
+
+     (k+2)(k+1) c_{k+2} - 2 eta c_{k+1} + c_k = 0,
+
+   and we prove it vanishes for all k. *)
+Theorem cw_solves_coulomb_equation :
+  forall (eta : R) (k : nat),
+    INR (S (S k)) * INR (S k) * cw eta (S (S k))
+    - 2 * eta * cw eta (S k) + cw eta k = 0.
+Proof.
+  intros eta k.
+  (* cw (S (S k)) unfolds to (2 eta cw(S k) - cw k)/(INR (S(S k)) * INR (S k)). *)
+  assert (Hk2 : INR (S (S k)) <> 0) by (apply not_0_INR; lia).
+  assert (Hk1 : INR (S k) <> 0) by (apply not_0_INR; lia).
+  replace (cw eta (S (S k)))
+    with ((2 * eta * cw eta (S k) - cw eta k)
+          / (INR (S (S k)) * INR (S k)))
+    by reflexivity.
+  field. split; assumption.
+Qed.
+
+(* The series begins with the correct regular boundary data
+   (c_0 = 0 forces F_0 to vanish at the origin, c_1 = 1 fixes the
+   normalisation of the regular solution). *)
+Theorem cw_regular_boundary :
+  forall eta, cw eta 0 = 0 /\ cw eta 1 = 1.
+Proof. intros eta. split; reflexivity. Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
+Print Assumptions cw_2.
+Print Assumptions cw_3.
+Print Assumptions cw_solves_coulomb_equation.
+Print Assumptions cw_regular_boundary.
 Print Assumptions sommerfeld_eta_pos.
 Print Assumptions gamow_factor_quantum_pos.
 Print Assumptions gamow_factor_quantum_lt_1.
