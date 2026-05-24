@@ -486,6 +486,90 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Fubini for finite sums (additive closure of products) === *)
+(* ================================================================== *)
+
+Lemma iter_rint_xyz_plus :
+  forall (f g : R -> R -> R -> R) (a b c d e h : R),
+    (forall x y, ex_RInt (fun z => f x y z) e h) ->
+    (forall x y, ex_RInt (fun z => g x y z) e h) ->
+    (forall x, ex_RInt (fun y => RInt (fun z => f x y z) e h) c d) ->
+    (forall x, ex_RInt (fun y => RInt (fun z => g x y z) e h) c d) ->
+    ex_RInt (fun x => RInt (fun y => RInt (fun z => f x y z) e h) c d) a b ->
+    ex_RInt (fun x => RInt (fun y => RInt (fun z => g x y z) e h) c d) a b ->
+    iter_rint_xyz (fun x y z => f x y z + g x y z) a b c d e h
+    = iter_rint_xyz f a b c d e h + iter_rint_xyz g a b c d e h.
+Proof.
+  intros f g a b c d e h Hz1 Hz2 Hy1 Hy2 Hx1 Hx2.
+  unfold iter_rint_xyz.
+  transitivity
+    (RInt (fun x => RInt (fun y => RInt (fun z => f x y z) e h
+                                  + RInt (fun z => g x y z) e h) c d) a b).
+  { apply RInt_ext. intros x _. apply RInt_ext. intros y _.
+    apply RInt_plus_R; [apply Hz1 | apply Hz2]. }
+  transitivity
+    (RInt (fun x => RInt (fun y => RInt (fun z => f x y z) e h) c d
+                  + RInt (fun y => RInt (fun z => g x y z) e h) c d) a b).
+  { apply RInt_ext. intros x _.
+    apply RInt_plus_R; [apply Hy1 | apply Hy2]. }
+  apply RInt_plus_R; [exact Hx1 | exact Hx2].
+Qed.
+
+Lemma iter_rint_yxz_plus :
+  forall (f g : R -> R -> R -> R) (a b c d e h : R),
+    (forall x y, ex_RInt (fun z => f x y z) e h) ->
+    (forall x y, ex_RInt (fun z => g x y z) e h) ->
+    (forall y, ex_RInt (fun x => RInt (fun z => f x y z) e h) a b) ->
+    (forall y, ex_RInt (fun x => RInt (fun z => g x y z) e h) a b) ->
+    ex_RInt (fun y => RInt (fun x => RInt (fun z => f x y z) e h) a b) c d ->
+    ex_RInt (fun y => RInt (fun x => RInt (fun z => g x y z) e h) a b) c d ->
+    iter_rint_yxz (fun x y z => f x y z + g x y z) a b c d e h
+    = iter_rint_yxz f a b c d e h + iter_rint_yxz g a b c d e h.
+Proof.
+  intros f g a b c d e h Hz1 Hz2 Hx1 Hx2 Hy1 Hy2.
+  unfold iter_rint_yxz.
+  transitivity
+    (RInt (fun y => RInt (fun x => RInt (fun z => f x y z) e h
+                                  + RInt (fun z => g x y z) e h) a b) c d).
+  { apply RInt_ext. intros y _. apply RInt_ext. intros x _.
+    apply RInt_plus_R; [apply Hz1 | apply Hz2]. }
+  transitivity
+    (RInt (fun y => RInt (fun x => RInt (fun z => f x y z) e h) a b
+                  + RInt (fun x => RInt (fun z => g x y z) e h) a b) c d).
+  { apply RInt_ext. intros y _.
+    apply RInt_plus_R; [apply Hx1 | apply Hx2]. }
+  apply RInt_plus_R; [exact Hy1 | exact Hy2].
+Qed.
+
+(* Fubini is closed under sums: if the x-y-z and y-x-z orderings agree
+   for f and for g (each Fubini-compatible), they agree for f + g.
+   With the separable-product base case, this gives Fubini for every
+   finite sum of separable terms. *)
+Theorem fubini_sum :
+  forall (f g : R -> R -> R -> R) (a b c d e h : R),
+    (forall x y, ex_RInt (fun z => f x y z) e h) ->
+    (forall x y, ex_RInt (fun z => g x y z) e h) ->
+    (forall x, ex_RInt (fun y => RInt (fun z => f x y z) e h) c d) ->
+    (forall x, ex_RInt (fun y => RInt (fun z => g x y z) e h) c d) ->
+    ex_RInt (fun x => RInt (fun y => RInt (fun z => f x y z) e h) c d) a b ->
+    ex_RInt (fun x => RInt (fun y => RInt (fun z => g x y z) e h) c d) a b ->
+    (forall y, ex_RInt (fun x => RInt (fun z => f x y z) e h) a b) ->
+    (forall y, ex_RInt (fun x => RInt (fun z => g x y z) e h) a b) ->
+    ex_RInt (fun y => RInt (fun x => RInt (fun z => f x y z) e h) a b) c d ->
+    ex_RInt (fun y => RInt (fun x => RInt (fun z => g x y z) e h) a b) c d ->
+    iter_rint_xyz f a b c d e h = iter_rint_yxz f a b c d e h ->
+    iter_rint_xyz g a b c d e h = iter_rint_yxz g a b c d e h ->
+    iter_rint_xyz (fun x y z => f x y z + g x y z) a b c d e h
+    = iter_rint_yxz (fun x y z => f x y z + g x y z) a b c d e h.
+Proof.
+  intros f g a b c d e h Hz1 Hz2 Hy1 Hy2 Hx1 Hx2 Hyx1 Hyx2 Hyy1 Hyy2 Hf Hg.
+  rewrite (iter_rint_xyz_plus f g a b c d e h Hz1 Hz2 Hy1 Hy2 Hx1 Hx2).
+  rewrite (iter_rint_yxz_plus f g a b c d e h Hz1 Hz2 Hyx1 Hyx2 Hyy1 Hyy2).
+  rewrite Hf, Hg. reflexivity.
+Qed.
+
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
@@ -497,3 +581,5 @@ Print Assumptions RInt_3D_swap_xz_separable.
 Print Assumptions iter_rint_const.
 Print Assumptions M_volumetric_3D_order_independent.
 Print Assumptions M_volumetric_3D_positive.
+Print Assumptions iter_rint_xyz_plus.
+Print Assumptions fubini_sum.
