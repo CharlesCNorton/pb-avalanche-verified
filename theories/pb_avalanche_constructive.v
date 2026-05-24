@@ -26,6 +26,7 @@
 From Stdlib Require Import Reals Lra Lia QArith List Bool ConstructiveEpsilon
                            Classical_Prop ClassicalDedekindReals
                            FunctionalExtensionality.
+From Coquelicot Require Import Rcomplements.  (* nfloor_ex: constructive floor *)
 From PBAvalanche Require Import
   pb_avalanche
   pb_avalanche_units
@@ -542,6 +543,89 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Classic-free FTC for the square: integral of x^2 === *)
+(* ================================================================== *)
+
+(* The Coquelicot route to integral_a^b x^2 = (b^3 - a^3)/3 runs through
+   the classical fundamental theorem of calculus (RInt_Derive), pulling
+   in Classical_Prop.classic. The midpoint Riemann sum of x^2 has the
+   exact closed form (b^3-a^3)/3 - (b-a)^3/(12 n^2), so its limit is the
+   integral and the whole derivation closes on the Dedekind axioms with
+   no classic — the polynomial FTC need not be classical. *)
+
+(* Constructive Archimedean witness: every real is below some INR n. *)
+Lemma arch_nat : forall x : R, exists n : nat, x < INR n.
+Proof.
+  intro x. destruct (Rle_dec 0 x) as [Hx | Hx].
+  - destruct (nfloor_ex x Hx) as [n [_ Hn]]. exists (S n). rewrite S_INR. lra.
+  - exists 1%nat. simpl. lra.
+Qed.
+
+(* Closed form of the midpoint sum of x^2. *)
+Lemma sum_midpoints_sq_closed :
+  forall (a b : R) (n : nat), (0 < n)%nat -> forall k : nat,
+    sum_midpoints (fun x => x * x) a b n k =
+    INR k * (a*a) + a*((b-a)/INR n)*(INR k * INR k)
+    + ((b-a)/INR n)*((b-a)/INR n)*((INR k * INR k * INR k)/3 - INR k/12).
+Proof.
+  intros a b n Hn. assert (HnR : INR n <> 0) by (apply not_0_INR; lia).
+  induction k as [|k IH].
+  - simpl. field. exact HnR.
+  - cbn [sum_midpoints]. cbv zeta. rewrite IH. rewrite S_INR. field. exact HnR.
+Qed.
+
+(* The uniform Riemann sum of x^2 equals the integral minus an explicit
+   O(1/n^2) midpoint error. *)
+Lemma riemann_sq_closed :
+  forall (a b : R) (n : nat), (0 < n)%nat ->
+    riemann_sum_uniform (fun x => x * x) a b n =
+    (b*b*b - a*a*a)/3 - (b-a)*(b-a)*(b-a)/(12*(INR n*INR n)).
+Proof.
+  intros a b n Hn. unfold riemann_sum_uniform.
+  rewrite (sum_midpoints_sq_closed a b n Hn n).
+  assert (HnR : INR n <> 0) by (apply not_0_INR; lia). field. exact HnR.
+Qed.
+
+(* Hence integral_a^b x^2 = (b^3 - a^3)/3, constructively. *)
+Theorem is_RInt_intuit_sq :
+  forall (a b : R),
+    is_RInt_intuit (fun x => x * x) a b ((b*b*b - a*a*a)/3).
+Proof.
+  intros a b eps Heps.
+  set (K := Rabs ((b-a)*(b-a)*(b-a)) / 12).
+  assert (HK : 0 <= K) by (unfold K; apply Rmult_le_pos; [apply Rabs_pos | lra]).
+  destruct (arch_nat (K / eps)) as [M HM].
+  exists (max 1 M). intros n Hn.
+  assert (HnRpos : 0 < INR n) by (apply lt_0_INR; lia).
+  assert (HnR1 : 1 <= INR n) by (rewrite <- INR_1; apply le_INR; lia).
+  assert (HnR : INR n <> 0) by (apply Rgt_not_eq; exact HnRpos).
+  assert (HMn : INR M <= INR n) by (apply le_INR; lia).
+  assert (HKlt : K < eps * INR n).
+  { apply Rlt_le_trans with (eps * INR M).
+    - apply (Rmult_lt_reg_r (/ eps)); [apply Rinv_0_lt_compat; exact Heps |].
+      replace (eps * INR M * / eps) with (INR M) by (field; lra).
+      replace (K * / eps) with (K / eps) by (unfold Rdiv; ring). exact HM.
+    - apply Rmult_le_compat_l; [lra | exact HMn]. }
+  rewrite (riemann_sq_closed a b n ltac:(lia)).
+  replace ((b*b*b - a*a*a)/3 - (b-a)*(b-a)*(b-a)/(12*(INR n*INR n)) - (b*b*b - a*a*a)/3)
+    with (- ((b-a)*(b-a)*(b-a)/(12*(INR n*INR n)))) by (field; exact HnR).
+  rewrite Rabs_Ropp.
+  assert (Hdpos : 0 < 12 * (INR n * INR n)) by nra.
+  unfold Rdiv. rewrite Rabs_mult. rewrite Rabs_inv.
+  rewrite (Rabs_pos_eq (12 * (INR n * INR n))) by lra.
+  assert (HKnum : Rabs ((b-a)*(b-a)*(b-a)) = 12 * K) by (unfold K; field).
+  rewrite HKnum.
+  apply Rmult_lt_reg_r with (r := 12 * (INR n * INR n)); [ exact Hdpos | ].
+  replace (12 * K * / (12 * (INR n * INR n)) * (12 * (INR n * INR n))) with (12 * K)
+    by (field; exact HnR).
+  apply Rlt_le_trans with (12 * (eps * INR n)).
+  - lra.
+  - replace (eps * (12 * (INR n * INR n))) with (12 * (eps * INR n) * INR n) by ring.
+    rewrite <- (Rmult_1_r (12 * (eps * INR n))) at 1.
+    apply Rmult_le_compat_l; [ nra | exact HnR1 ].
+Qed.
+
+(* ================================================================== *)
 (* === Uniqueness of the constructive integral === *)
 (* ================================================================== *)
 
@@ -592,6 +676,7 @@ Print Assumptions is_RInt_intuit_le.
 Print Assumptions is_RInt_intuit_affine.
 Print Assumptions is_RInt_intuit_ftc_id.
 Print Assumptions is_RInt_intuit_ftc_constant.
+Print Assumptions is_RInt_intuit_sq.
 Print Assumptions is_RInt_intuit_scal.
 Print Assumptions riemann_sum_uniform_const.
 
