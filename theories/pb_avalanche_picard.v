@@ -223,6 +223,45 @@ Proof.
         [apply continuous_const | apply continuous_id].
 Qed.
 
+(* Continuity of the indefinite integral of a globally continuous
+   integrand: the fundamental theorem of calculus gives it a pointwise
+   derivative, hence continuity. *)
+Lemma indefinite_integral_cont :
+  forall (g : R -> R),
+    (forall x, continuous g x) ->
+    forall t, continuous (fun u => RInt g 0 u) t.
+Proof.
+  intros g Hg t.
+  apply (continuous_RInt_1 (V := R_CompleteNormedModule) g 0 t
+           (fun u => RInt g 0 u)).
+  apply filter_forall. intro z. apply RInt_correct.
+  apply ex_RInt_continuous. intros y _. apply Hg.
+Qed.
+
+(* Real-valued specialisations of the abstract integral combinators. *)
+Lemma RInt_minus_R :
+  forall (f g : R -> R) (a b : R),
+    ex_RInt f a b -> ex_RInt g a b ->
+    RInt (fun x => f x - g x) a b = RInt f a b - RInt g a b.
+Proof.
+  intros f g a b Hf Hg.
+  replace (RInt f a b - RInt g a b)
+    with (minus (RInt f a b) (RInt g a b)) by reflexivity.
+  rewrite <- (RInt_minus (V := R_CompleteNormedModule) f g a b Hf Hg).
+  apply RInt_ext. intros x _. reflexivity.
+Qed.
+
+Lemma RInt_scal_R :
+  forall (l : R) (f : R -> R) (a b : R),
+    ex_RInt f a b ->
+    RInt (fun x => l * f x) a b = l * RInt f a b.
+Proof.
+  intros l f a b Hf.
+  replace (l * RInt f a b) with (scal l (RInt f a b)) by reflexivity.
+  rewrite <- (RInt_scal (V := R_CompleteNormedModule) f a b l Hf).
+  apply RInt_ext. intros x _. reflexivity.
+Qed.
+
 Section GeneralPicard.
 
   Variable R_primary tau_ash : R.
@@ -300,6 +339,124 @@ Section GeneralPicard.
     - rewrite picard_step2. unfold picard_iter_2. field. lra.
   Qed.
 
+  (* Every Picard iterate is continuous: by induction, an iterate is the
+     indefinite integral of a continuous integrand built from the previous
+     iterate, and that indefinite integral is continuous. *)
+  Lemma picard_cont : forall n t, continuous (picard 0 0 n) t.
+  Proof.
+    induction n as [|n IH]; intro t.
+    - replace (picard 0 0 0) with (fun _ : R => 0) by reflexivity.
+      apply continuous_const.
+    - replace (picard 0 0 (S n))
+        with (fun u => 0 + RInt (fun s => Faff (picard 0 0 n s)) 0 u)
+        by reflexivity.
+      apply (continuous_plus (V := R_NormedModule)
+               (fun _ => 0)
+               (fun u => RInt (fun s => Faff (picard 0 0 n s)) 0 u)).
+      + apply continuous_const.
+      + apply indefinite_integral_cont. intro x. unfold Faff.
+        apply (continuous_minus (V := R_NormedModule)
+                 (fun _ => R_primary) (fun u => picard 0 0 n u / tau_ash)).
+        * apply continuous_const.
+        * unfold Rdiv.
+          apply (continuous_mult (picard 0 0 n) (fun _ => / tau_ash));
+            [ apply IH | apply continuous_const ].
+  Qed.
+
+  (* The affine right-hand side has increment -1/tau times the state
+     increment. *)
+  Lemma Faff_diff : forall a b, Faff a - Faff b = - / tau_ash * (a - b).
+  Proof. intros a b. unfold Faff. field; lra. Qed.
+
+  (* One-step Picard error recursion against the fixed point:
+       e_{n+1}(t) = -1/tau * integral_0^t e_n(s) ds,
+     where e_n(t) = picard 0 0 n t - n_ash_solution t. This linear-in-the-
+     error identity is the contraction underlying the Banach argument. *)
+  Theorem picard_error_one_step :
+    forall n t,
+      picard 0 0 (S n) t - n_ash_solution R_primary tau_ash t
+      = - / tau_ash
+        * RInt (fun s => picard 0 0 n s - n_ash_solution R_primary tau_ash s) 0 t.
+  Proof.
+    intros n t.
+    replace (picard 0 0 (S n) t)
+      with (0 + RInt (fun s => Faff (picard 0 0 n s)) 0 t) by reflexivity.
+    rewrite Rplus_0_l.
+    rewrite (n_ash_solution_fixed_point R_primary tau_ash tau_pos t).
+    assert (Hext :
+      RInt (fun s => F_ash R_primary tau_ash (n_ash_solution R_primary tau_ash s)) 0 t
+      = RInt (fun s => Faff (n_ash_solution R_primary tau_ash s)) 0 t).
+    { apply RInt_ext. intros s _. unfold F_ash, Faff. reflexivity. }
+    rewrite Hext.
+    assert (Hcp : forall s, continuous (fun u => Faff (picard 0 0 n u)) s).
+    { intro s. unfold Faff.
+      apply (continuous_minus (V := R_NormedModule)
+               (fun _ => R_primary) (fun u => picard 0 0 n u / tau_ash)).
+      - apply continuous_const.
+      - unfold Rdiv. apply (continuous_mult (picard 0 0 n) (fun _ => / tau_ash));
+          [ apply picard_cont | apply continuous_const ]. }
+    assert (Hcn : forall s,
+      continuous (fun u => Faff (n_ash_solution R_primary tau_ash u)) s).
+    { intro s. unfold Faff.
+      apply (continuous_minus (V := R_NormedModule)
+               (fun _ => R_primary)
+               (fun u => n_ash_solution R_primary tau_ash u / tau_ash)).
+      - apply continuous_const.
+      - unfold Rdiv.
+        apply (continuous_mult (n_ash_solution R_primary tau_ash) (fun _ => / tau_ash));
+          [ apply (n_ash_solution_cont R_primary tau_ash tau_pos)
+          | apply continuous_const ]. }
+    assert (Hep : @ex_RInt R_CompleteNormedModule
+      (fun s => Faff (picard 0 0 n s)) 0 t)
+      by (apply ex_RInt_continuous; intros z _; apply Hcp).
+    assert (Hen : @ex_RInt R_CompleteNormedModule
+      (fun s => Faff (n_ash_solution R_primary tau_ash s)) 0 t)
+      by (apply ex_RInt_continuous; intros z _; apply Hcn).
+    assert (Hed : @ex_RInt R_CompleteNormedModule
+      (fun s => picard 0 0 n s - n_ash_solution R_primary tau_ash s) 0 t).
+    { apply ex_RInt_continuous. intros z _.
+      apply (continuous_minus (V := R_NormedModule)
+               (picard 0 0 n) (n_ash_solution R_primary tau_ash)).
+      - apply picard_cont.
+      - apply (n_ash_solution_cont R_primary tau_ash tau_pos). }
+    rewrite <- (RInt_minus_R _ _ 0 t Hep Hen).
+    rewrite <- (RInt_scal_R (- / tau_ash)
+                  (fun s => picard 0 0 n s - n_ash_solution R_primary tau_ash s)
+                  0 t Hed).
+    apply RInt_ext. intros s _. apply Faff_diff.
+  Qed.
+
+  (* Absolute-value contraction:
+       |e_{n+1}(t)| <= (1/tau) integral_0^t |e_n(s)| ds.
+     Bounding |e_n| by its supremum on [0,T] gives |e_{n+1}| <= (T/tau)
+     sup|e_n|, the geometric contraction for T < tau. *)
+  Theorem picard_error_contraction :
+    forall n t, 0 <= t ->
+      Rabs (picard 0 0 (S n) t - n_ash_solution R_primary tau_ash t)
+      <= / tau_ash
+         * RInt (fun s =>
+                   Rabs (picard 0 0 n s - n_ash_solution R_primary tau_ash s)) 0 t.
+  Proof.
+    intros n t Ht.
+    rewrite (picard_error_one_step n t).
+    rewrite Rabs_mult.
+    replace (Rabs (- / tau_ash)) with (/ tau_ash).
+    2:{ rewrite Rabs_Ropp. symmetry. apply Rabs_pos_eq. left.
+        apply Rinv_0_lt_compat. exact tau_pos. }
+    apply Rmult_le_compat_l.
+    - left. apply Rinv_0_lt_compat. exact tau_pos.
+    - apply abs_RInt_le.
+      + exact Ht.
+      + assert (Hd : @ex_RInt R_CompleteNormedModule
+          (fun s => picard 0 0 n s - n_ash_solution R_primary tau_ash s) 0 t).
+        { apply ex_RInt_continuous. intros z _.
+          apply (continuous_minus (V := R_NormedModule)
+                   (picard 0 0 n) (n_ash_solution R_primary tau_ash)).
+          - apply picard_cont.
+          - apply (n_ash_solution_cont R_primary tau_ash tau_pos). }
+        exact Hd.
+  Qed.
+
 End GeneralPicard.
 
 (* ================================================================== *)
@@ -358,3 +515,6 @@ Print Assumptions picard_matches_closed_forms.
 Print Assumptions n_ash_solution_fixed_point.
 Print Assumptions n_ash_solution_nonneg.
 Print Assumptions n_ash_solution_bounded_by_eq.
+Print Assumptions picard_cont.
+Print Assumptions picard_error_one_step.
+Print Assumptions picard_error_contraction.
