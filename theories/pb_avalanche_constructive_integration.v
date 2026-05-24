@@ -214,6 +214,41 @@ Proof.
     apply Rmult_lt_compat_l; assumption.
 Qed.
 
+(* === Extensionality and further closure (all classic-free) === *)
+
+Lemma sum_midpoints_ext :
+  forall (f g : R -> R) (a b : R) (n m : nat),
+    (forall x, f x = g x) ->
+    sum_midpoints f a b n m = sum_midpoints g a b n m.
+Proof.
+  intros f g a b n m Hfg. induction m as [|m IH]; simpl; [reflexivity |].
+  rewrite IH, Hfg. reflexivity.
+Qed.
+
+Theorem is_RInt_intuit_ext :
+  forall (f g : R -> R) (a b l : R),
+    (forall x, f x = g x) ->
+    is_RInt_intuit f a b l -> is_RInt_intuit g a b l.
+Proof.
+  intros f g a b l Hfg Hf eps Heps.
+  destruct (Hf eps Heps) as [N HN]. exists N. intros n Hn.
+  unfold riemann_sum_uniform.
+  rewrite <- (sum_midpoints_ext f g a b n n Hfg).
+  exact (HN n Hn).
+Qed.
+
+Theorem is_RInt_intuit_opp :
+  forall (f : R -> R) (a b l : R),
+    is_RInt_intuit f a b l ->
+    is_RInt_intuit (fun x => - f x) a b (- l).
+Proof.
+  intros f a b l Hf.
+  apply (is_RInt_intuit_ext (fun x => -1 * f x) (fun x => - f x)).
+  - intro x. ring.
+  - replace (- l) with (-1 * l) by ring.
+    apply is_RInt_intuit_scal. exact Hf.
+Qed.
+
 (* === Additivity of is_RInt_intuit === *)
 
 Lemma sum_midpoints_plus :
@@ -246,6 +281,20 @@ Proof.
   pose proof (HNg n (Nat.le_trans _ _ _ (Nat.le_max_r Nf Ng) Hn)) as Hbg.
   unfold riemann_sum_uniform in Hbf, Hbg.
   lra.
+Qed.
+
+(* Subtraction closure, from additivity and negation. *)
+Theorem is_RInt_intuit_minus :
+  forall (f g : R -> R) (a b lf lg : R),
+    is_RInt_intuit f a b lf ->
+    is_RInt_intuit g a b lg ->
+    is_RInt_intuit (fun x => f x - g x) a b (lf - lg).
+Proof.
+  intros f g a b lf lg Hf Hg.
+  apply (is_RInt_intuit_ext (fun x => f x + - g x) (fun x => f x - g x)).
+  - intro x. ring.
+  - replace (lf - lg) with (lf + - lg) by ring.
+    apply is_RInt_intuit_plus; [exact Hf | apply is_RInt_intuit_opp; exact Hg].
 Qed.
 
 (* === Monotonicity (the RInt_le analog) === *)
@@ -404,6 +453,9 @@ Qed.
 (* ================================================================== *)
 
 Print Assumptions is_RInt_intuit_unique.
+Print Assumptions is_RInt_intuit_ext.
+Print Assumptions is_RInt_intuit_opp.
+Print Assumptions is_RInt_intuit_minus.
 
 (* Goal: the constructive integration predicate does not depend on
    Classical_Prop.classic. The axiom audit at the bottom of this file

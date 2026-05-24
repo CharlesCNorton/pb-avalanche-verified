@@ -211,6 +211,46 @@ Proof.
   - left. exact Hnp.
 Qed.
 
+(* The double negation of excluded middle is a constructive theorem —
+   no axiom. This is the precise sense in which weak LEM is free while
+   full LEM (classic) is not. *)
+Theorem not_not_excluded_middle : forall P : Prop, ~ ~ (P \/ ~ P).
+Proof.
+  intros P Hno. apply Hno. right. intro Hp. apply Hno. left. exact Hp.
+Qed.
+
+(* classic gives material implication: P -> Q is ~P \/ Q. *)
+Theorem classic_material_implication :
+  Axiom_classic -> forall P Q : Prop, (P -> Q) -> ~ P \/ Q.
+Proof.
+  intros Hclassic P Q Hpq.
+  destruct (Hclassic P) as [Hp | Hnp].
+  - right. apply Hpq. exact Hp.
+  - left. exact Hnp.
+Qed.
+
+(* classic gives the contrapositive law (needs double-negation
+   elimination, hence excluded middle). *)
+Theorem classic_contrapositive :
+  Axiom_classic -> forall P Q : Prop, (~ Q -> ~ P) -> P -> Q.
+Proof.
+  intros Hclassic P Q Hcontra Hp.
+  destruct (Hclassic Q) as [Hq | Hnq].
+  - exact Hq.
+  - exfalso. apply (Hcontra Hnq Hp).
+Qed.
+
+(* classic gives Dummett's linearity (the disjunction of the two
+   implication directions). *)
+Theorem classic_implies_linearity :
+  Axiom_classic -> forall P Q : Prop, (P -> Q) \/ (Q -> P).
+Proof.
+  intros Hclassic P Q.
+  destruct (Hclassic P) as [Hp | Hnp].
+  - right. intro. exact Hp.
+  - left. intro Hp. exfalso. apply Hnp. exact Hp.
+Qed.
+
 (* === Genuine funext witness ===
    Two functions that are extensionally equal but built differently:
    `fun n => n + 0` and `fun n => n`. They are equal as functions
@@ -362,3 +402,7 @@ Print Assumptions funext_distinguishes.
 Print Assumptions sig_forall_dec_decides_concrete.
 Print Assumptions sig_forall_dec_implies_LPO.
 Print Assumptions bool_search_informative.
+Print Assumptions not_not_excluded_middle.
+Print Assumptions classic_material_implication.
+Print Assumptions classic_contrapositive.
+Print Assumptions classic_implies_linearity.
