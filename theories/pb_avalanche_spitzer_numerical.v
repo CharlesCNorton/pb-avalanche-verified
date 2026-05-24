@@ -23,7 +23,8 @@
 (*                                                                            *)
 (******************************************************************************)
 
-From Stdlib Require Import Reals Lra.
+From Stdlib Require Import Reals Lra QArith Qreals.
+Close Scope Q_scope.
 Open Scope R_scope.
 
 (* ================================================================== *)
@@ -143,9 +144,105 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Interval-verified subcriticality over the uncertainty box === *)
+(* ================================================================== *)
+
+(* The settlement's figure-of-merit bound is
+     FoM_max_reactor = 3 * n_B_max * tau_max * sigma_knockon_max * v_alpha_max,
+   and each concrete instantiation discharges FoM_max_reactor < 1 at a
+   single chosen rational point. The physical inputs carry measurement
+   uncertainty, so a point estimate understates the claim. Here a small
+   sound rational-interval kernel propagates each input as an interval
+   [value*(1-eps), value*(1+eps)] and proves the figure of merit stays
+   below 1 for EVERY value in the box, not only at the chosen point. *)
+
+Record QI := mkQI { qlo : Q ; qhi : Q }.
+
+(* The real x lies within the rational interval. *)
+Definition QIcontains (i : QI) (x : R) : Prop :=
+  Q2R (qlo i) <= x /\ x <= Q2R (qhi i).
+
+Definition QInonneg (i : QI) : Prop := (0 <= qlo i)%Q.
+
+Definition QIscale (c : Q) (i : QI) : QI := mkQI (c * qlo i)%Q (c * qhi i)%Q.
+Definition QImul   (i j : QI) : QI := mkQI (qlo i * qlo j)%Q (qhi i * qhi j)%Q.
+
+Lemma Q2R_nonneg : forall q, (0 <= q)%Q -> 0 <= Q2R q.
+Proof.
+  intros q H. apply Qle_Rle in H.
+  assert (Q2R 0 = 0) by (compute; lra). lra.
+Qed.
+
+(* Scaling by a nonnegative rational is sound: it encloses c * x. *)
+Lemma QIscale_sound : forall c i x,
+  (0 <= c)%Q -> QIcontains i x -> QIcontains (QIscale c i) (Q2R c * x).
+Proof.
+  intros c i x Hc [Hlo Hhi]. unfold QIcontains, QIscale; cbn [qlo qhi].
+  rewrite !Q2R_mult. pose proof (Q2R_nonneg c Hc) as Hc'.
+  split; apply Rmult_le_compat_l; assumption.
+Qed.
+
+(* Multiplication of nonnegative intervals is sound: it encloses x * y. *)
+Lemma QImul_sound : forall i j x y,
+  QInonneg i -> QInonneg j -> QIcontains i x -> QIcontains j y ->
+  QIcontains (QImul i j) (x * y).
+Proof.
+  intros i j x y Hi Hj [Hilo Hihi] [Hjlo Hjhi].
+  unfold QIcontains, QImul; cbn [qlo qhi]. rewrite !Q2R_mult.
+  pose proof (Q2R_nonneg _ Hi) as Hi'. pose proof (Q2R_nonneg _ Hj) as Hj'.
+  split; [ apply Rmult_le_compat; assumption | apply Rmult_le_compat; lra ].
+Qed.
+
+(* Input intervals (central value with +/-5% uncertainty), in the
+   rescaled unit system: boron density ~1, slowing-down time ~0.1,
+   knock-on cross section ~0.002, alpha velocity ~1. *)
+Definition i_nB    : QI := mkQI (95 # 100)%Q (105 # 100)%Q.
+Definition i_tau   : QI := mkQI (95 # 1000)%Q (105 # 1000)%Q.
+Definition i_sigma : QI := mkQI (19 # 10000)%Q (21 # 10000)%Q.
+Definition i_v     : QI := mkQI (95 # 100)%Q (105 # 100)%Q.
+
+(* The propagated enclosure of FoM_max = 3 * n_B * tau * sigma * v. *)
+Definition FoM_box : QI :=
+  QIscale 3 (QImul i_nB (QImul i_tau (QImul i_sigma i_v))).
+
+(* The enclosure's upper endpoint is below 1 (a closed rational check). *)
+Lemma FoM_box_hi_lt_1 : (qhi FoM_box < 1)%Q.
+Proof. now vm_compute. Qed.
+
+(* Hence the figure of merit is subcritical for every choice of inputs
+   inside the uncertainty box, not merely at the chosen rationals. *)
+Theorem fom_subcritical_over_box :
+  forall nB tau sigma v,
+    QIcontains i_nB nB -> QIcontains i_tau tau ->
+    QIcontains i_sigma sigma -> QIcontains i_v v ->
+    3 * nB * tau * sigma * v < 1.
+Proof.
+  intros nB tau sigma v HnB Htau Hsig Hv.
+  assert (Hsv : QIcontains (QImul i_sigma i_v) (sigma * v))
+    by (apply QImul_sound; [ now vm_compute | now vm_compute | exact Hsig | exact Hv ]).
+  assert (Htsv : QIcontains (QImul i_tau (QImul i_sigma i_v)) (tau * (sigma * v)))
+    by (apply QImul_sound; [ now vm_compute | now vm_compute | exact Htau | exact Hsv ]).
+  assert (Hntsv : QIcontains (QImul i_nB (QImul i_tau (QImul i_sigma i_v)))
+                    (nB * (tau * (sigma * v))))
+    by (apply QImul_sound; [ now vm_compute | now vm_compute | exact HnB | exact Htsv ]).
+  assert (Hfom : QIcontains FoM_box (Q2R 3 * (nB * (tau * (sigma * v)))))
+    by (apply QIscale_sound; [ now vm_compute | exact Hntsv ]).
+  destruct Hfom as [_ Hhi].
+  pose proof (Qlt_Rlt _ _ FoM_box_hi_lt_1) as Hlt.
+  assert (HR1 : Q2R 1 = 1) by (compute; lra).
+  assert (HR3 : Q2R 3 = 3) by (unfold Q2R; simpl; lra).
+  replace (3 * nB * tau * sigma * v)
+    with (Q2R 3 * (nB * (tau * (sigma * v)))) by (rewrite HR3; ring).
+  lra.
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
 Print Assumptions Cspitzer_formula_pos.
 Print Assumptions Cspitzer_lnLambda_inverse.
 Print Assumptions Cspitzer_Z_squared_inverse.
+Print Assumptions QIscale_sound.
+Print Assumptions QImul_sound.
+Print Assumptions fom_subcritical_over_box.
