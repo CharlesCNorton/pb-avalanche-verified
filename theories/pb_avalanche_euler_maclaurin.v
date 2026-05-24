@@ -379,6 +379,79 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === The Bernoulli sequence from its defining recurrence === *)
+(* ================================================================== *)
+
+(* Pascal's triangle, for the binomial coefficients of the recurrence. *)
+Fixpoint binom (n k : nat) : nat :=
+  match n, k with
+  | _, O => 1%nat
+  | O, S _ => 0%nat
+  | S n', S k' => (binom n' k' + binom n' (S k'))%nat
+  end.
+
+Section BernoulliSequence.
+Local Open Scope Q_scope.
+
+(* Given the prefix [B_0; ...; B_{m-1}], the defining relation
+   sum_{j=0}^{m} C(m+1,j) B_j = 0 (with C(m+1,m) = m+1) solves for
+     B_m = - 1/(m+1) * sum_{j=0}^{m-1} C(m+1,j) B_j. *)
+Definition next_bernoulli (L : list Q) (m : nat) : Q :=
+  - (1 # 1) / inject_Z (Z.of_nat (m + 1)%nat)
+  * fold_right Qplus 0
+      (map (fun j : nat => inject_Z (Z.of_nat (binom (m + 1)%nat j)) * nth j L 0)
+           (seq 0%nat m)).
+
+(* The sequence built iteratively as [B_0; ...; B_n]. *)
+Fixpoint bernoulli_list (n : nat) : list Q :=
+  match n with
+  | O => 1 :: nil
+  | S k => let L := bernoulli_list k in L ++ next_bernoulli L (S k) :: nil
+  end.
+
+Definition bernoulli (n : nat) : Q := nth n (bernoulli_list n) 0.
+
+(* The construction reproduces the classical Bernoulli numbers. *)
+Example bernoulli_val_0 : bernoulli 0 == 1.         Proof. vm_compute. reflexivity. Qed.
+Example bernoulli_val_1 : bernoulli 1 == (-1) # 2.  Proof. vm_compute. reflexivity. Qed.
+Example bernoulli_val_2 : bernoulli 2 == 1 # 6.     Proof. vm_compute. reflexivity. Qed.
+Example bernoulli_val_3 : bernoulli 3 == 0.         Proof. vm_compute. reflexivity. Qed.
+Example bernoulli_val_4 : bernoulli 4 == (-1) # 30. Proof. vm_compute. reflexivity. Qed.
+Example bernoulli_val_6 : bernoulli 6 == 1 # 42.    Proof. vm_compute. reflexivity. Qed.
+Example bernoulli_val_8 : bernoulli 8 == (-1) # 30. Proof. vm_compute. reflexivity. Qed.
+
+(* The constructed sequence satisfies its own defining recurrence
+   sum_{j=0}^{n} C(n+1,j) B_j = 0 for every n >= 1. *)
+Definition bern_recurrence_sum (n : nat) : Q :=
+  fold_right Qplus 0
+    (map (fun j : nat => inject_Z (Z.of_nat (binom (n + 1)%nat j)) * bernoulli j)
+         (seq 0%nat (S n))).
+
+Example bern_recurrence_1 : bern_recurrence_sum 1 == 0. Proof. vm_compute. reflexivity. Qed.
+Example bern_recurrence_2 : bern_recurrence_sum 2 == 0. Proof. vm_compute. reflexivity. Qed.
+Example bern_recurrence_3 : bern_recurrence_sum 3 == 0. Proof. vm_compute. reflexivity. Qed.
+Example bern_recurrence_4 : bern_recurrence_sum 4 == 0. Proof. vm_compute. reflexivity. Qed.
+Example bern_recurrence_5 : bern_recurrence_sum 5 == 0. Proof. vm_compute. reflexivity. Qed.
+
+End BernoulliSequence.
+
+(* The order-2 Euler-Maclaurin correction IS the Bernoulli B_2 term:
+   the trapezoidal error for x^2 equals (B_2 / 2!) h^2 (f'(b) - f'(a))
+   with f'(x) = 2x. This identifies the rule's error coefficient with
+   the Bernoulli number B_2 = 1/6 of the general expansion. *)
+Theorem trap_rule_sq_bernoulli_term :
+  forall (a b : R) (n : nat), (0 < n)%nat ->
+    trap_rule_sq a b n - integral_sq a b
+    = B_2 / 2 * (((b - a) / INR n) * ((b - a) / INR n)) * (2 * b - 2 * a).
+Proof.
+  intros a b n Hn.
+  rewrite (trap_rule_sq_euler_maclaurin a b n Hn).
+  unfold B_2.
+  assert (HnR : INR n <> 0) by (apply not_0_INR; lia).
+  field. exact HnR.
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
@@ -394,3 +467,5 @@ Print Assumptions const_trap_richardson_exact.
 Print Assumptions trap_terms_sq_closed.
 Print Assumptions trap_rule_sq_euler_maclaurin.
 Print Assumptions richardson_1_exact_for_sq.
+Print Assumptions bernoulli.
+Print Assumptions trap_rule_sq_bernoulli_term.
