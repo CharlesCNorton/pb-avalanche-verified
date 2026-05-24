@@ -294,9 +294,56 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Weak form equals strong form (the delta-source duality) === *)
+(* ================================================================== *)
+
+(* The weak drift pairing of f against a test function equals the
+   strong-form drift operator -(Edot f)' integrated against phi. This
+   is the distributional identity: a weak solution paired with phi
+   recovers the classical operator. The delta-source statement
+   weak_FP f phi = S phi(E_birth) is the special case where the strong
+   operator -(Edot f)' is the point source S delta(E - E_birth). *)
+Theorem weak_FP_drift_is_strong :
+  forall (a b : R) (phi_d : test_function a b) (f Edot psi' : R -> R),
+    (forall x, is_derive (fun E => Edot E * f E) x (psi' x)) ->
+    (forall x, continuous psi' x) ->
+    weak_FP_drift f Edot phi_d
+    = - RInt (fun E => phi phi_d E * psi' E) a b.
+Proof.
+  intros a b phi_d f Edot psi' Hd Hc.
+  unfold weak_FP_drift.
+  transitivity (RInt (fun E => phi' phi_d E * (Edot E * f E)) a b).
+  { apply RInt_ext. intros E _. lra. }
+  apply (integration_by_parts_test a b phi_d
+           (fun E => Edot E * f E) psi' Hd Hc).
+Qed.
+
+(* If the strong drift operator -(Edot f)' equals a source density g,
+   the weak pairing is exactly g integrated against the test function:
+   the weak and strong formulations agree. *)
+Corollary weak_FP_drift_source :
+  forall (a b : R) (phi_d : test_function a b) (f Edot psi' g : R -> R),
+    (forall x, is_derive (fun E => Edot E * f E) x (psi' x)) ->
+    (forall x, continuous psi' x) ->
+    ex_RInt (fun E => phi phi_d E * psi' E) a b ->
+    (forall x, g x = - psi' x) ->
+    weak_FP_drift f Edot phi_d
+    = RInt (fun E => phi phi_d E * g E) a b.
+Proof.
+  intros a b phi_d f Edot psi' g Hd Hc Hex Hg.
+  rewrite (weak_FP_drift_is_strong a b phi_d f Edot psi' Hd Hc).
+  pose proof (RInt_opp (fun E => phi phi_d E * psi' E) a b Hex) as Hopp.
+  unfold opp in Hopp; simpl in Hopp.
+  rewrite <- Hopp.
+  apply RInt_ext. intros E _. rewrite Hg. unfold opp; simpl. ring.
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
+Print Assumptions weak_FP_drift_is_strong.
+Print Assumptions weak_FP_drift_source.
 Print Assumptions test_boundary_a.
 Print Assumptions test_boundary_b.
 Print Assumptions weak_FP_zero.
