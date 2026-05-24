@@ -174,30 +174,7 @@ Proof.
   field. split; [lra | apply Rgt_not_eq, b_G_pos].
 Qed.
 
-(* The Gamow peak scales as T^{2/3} when b_G is fixed. *)
-Theorem gamow_peak_scaling_T :
-  forall T1 T2, 0 < T1 -> T1 <= T2 -> gamow_peak T1 <= gamow_peak T2.
-Proof.
-  intros T1 T2 HT1 H12.
-  unfold gamow_peak.
-  unfold Rpower.
-  apply Rlt_le, exp_increasing.
-  apply Rmult_lt_compat_l; [lra |].
-  apply ln_increasing.
-  - apply Rdiv_lt_0_compat.
-    + apply Rmult_lt_0_compat; [apply b_G_pos | exact HT1].
-    + lra.
-  - apply Rmult_lt_compat_r.
-    + apply Rinv_0_lt_compat. lra.
-    + apply Rmult_lt_compat_l; [apply b_G_pos |].
-      (* Need T1 < T2 strict — but we only have T1 <= T2. Use the
-         general case where T1 = T2 is handled separately. *)
-      destruct H12 as [H12 | H12].
-      * exact H12.
-      * (* T1 = T2: gamow_peak T1 = gamow_peak T2, so <= holds. We're
-           inside Rlt_le, which only needs strict inequality. *)
-Abort.
-
+(* The Gamow peak is monotone in temperature (it scales as T^{2/3}). *)
 Theorem gamow_peak_monotone_T :
   forall T1 T2, 0 < T1 -> T1 <= T2 -> gamow_peak T1 <= gamow_peak T2.
 Proof.
