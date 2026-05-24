@@ -441,6 +441,90 @@ Qed.
 End Cw.
 
 (* ================================================================== *)
+(* === The Coulomb Wronskian invariant === *)
+(* ================================================================== *)
+
+(* The regular F_0 and irregular G_0 Coulomb functions are two solutions
+   of one second-order linear equation w'' + (1 - 2 eta / rho) w = 0.
+   Their Wronskian W = F G' - F' G is therefore constant in rho: this is
+   the structural identity that makes the penetrability
+   P_0 = 1 / (F_0^2 + G_0^2) well defined and that fixes the asymptotic
+   normalisation F_0 ~ sin(theta), G_0 ~ cos(theta). We prove it for any
+   second-order equation w'' + pot w = 0 and specialise to the Coulomb
+   potential. *)
+Theorem wronskian_constant_2nd_order :
+  forall (pot u v u' v' u'' v'' : R -> R),
+    (forall x, is_derive u x (u' x)) ->
+    (forall x, is_derive u' x (u'' x)) ->
+    (forall x, is_derive v x (v' x)) ->
+    (forall x, is_derive v' x (v'' x)) ->
+    (forall x, u'' x + pot x * u x = 0) ->
+    (forall x, v'' x + pot x * v x = 0) ->
+    forall x, is_derive (fun s => u s * v' s - u' s * v s) x 0.
+Proof.
+  intros pot u v u' v' u'' v'' Hu Hu' Hv Hv' HODEu HODEv x.
+  assert (HW : is_derive (fun s => u s * v' s - u' s * v s) x
+                 (u' x * v' x + u x * v'' x - (u'' x * v x + u' x * v' x))).
+  { apply (is_derive_minus (fun s => u s * v' s) (fun s => u' s * v s)).
+    - apply (is_derive_mult u v' x (u' x) (v'' x));
+        [ apply Hu | apply Hv' | intros n m; apply Rmult_comm ].
+    - apply (is_derive_mult u' v x (u'' x) (v' x));
+        [ apply Hu' | apply Hv | intros n m; apply Rmult_comm ]. }
+  assert (Hval : u' x * v' x + u x * v'' x - (u'' x * v x + u' x * v' x) = 0).
+  { pose proof (HODEu x) as Eu. pose proof (HODEv x) as Ev. nra. }
+  rewrite <- Hval. exact HW.
+Qed.
+
+(* Hence the Wronskian takes the same value at every two points: it is a
+   genuine constant of the motion (Abel's identity for this equation). *)
+Corollary wronskian_constant_value :
+  forall (pot u v u' v' u'' v'' : R -> R),
+    (forall x, is_derive u x (u' x)) ->
+    (forall x, is_derive u' x (u'' x)) ->
+    (forall x, is_derive v x (v' x)) ->
+    (forall x, is_derive v' x (v'' x)) ->
+    (forall x, u'' x + pot x * u x = 0) ->
+    (forall x, v'' x + pot x * v x = 0) ->
+    forall x0 x,
+      u x * v' x - u' x * v x = u x0 * v' x0 - u' x0 * v x0.
+Proof.
+  intros pot u v u' v' u'' v'' Hu Hu' Hv Hv' HODEu HODEv x0 x.
+  assert (Hd : forall s, is_derive (fun w => u w * v' w - u' w * v w) s 0)
+    by (apply (wronskian_constant_2nd_order pot u v u' v' u'' v''); assumption).
+  assert (HR : is_RInt (fun _ : R => 0) x0 x
+                 (minus (u x * v' x - u' x * v x)
+                        (u x0 * v' x0 - u' x0 * v x0))).
+  { apply (is_RInt_derive (V := R_CompleteNormedModule)
+             (fun w => u w * v' w - u' w * v w) (fun _ => 0) x0 x).
+    - intros s _. apply Hd.
+    - intros s _. apply continuous_const. }
+  pose proof (is_RInt_unique _ _ _ _ HR) as A.
+  rewrite RInt_const in A.
+  unfold scal in A; simpl in A; unfold mult in A; simpl in A.
+  rewrite Rmult_0_r in A.
+  unfold minus, plus, opp in A; simpl in A.
+  lra.
+Qed.
+
+(* The Coulomb specialisation: pot(rho) = 1 - 2 eta / rho. *)
+Corollary coulomb_wronskian_constant :
+  forall (eta : R) (F G F' G' F'' G'' : R -> R),
+    (forall rho, is_derive F rho (F' rho)) ->
+    (forall rho, is_derive F' rho (F'' rho)) ->
+    (forall rho, is_derive G rho (G' rho)) ->
+    (forall rho, is_derive G' rho (G'' rho)) ->
+    (forall rho, F'' rho + (1 - 2 * eta / rho) * F rho = 0) ->
+    (forall rho, G'' rho + (1 - 2 * eta / rho) * G rho = 0) ->
+    forall rho0 rho,
+      F rho * G' rho - F' rho * G rho
+      = F rho0 * G' rho0 - F' rho0 * G rho0.
+Proof.
+  intros eta F G F' G' F'' G'' HF HF' HG HG' HODEF HODEG.
+  apply (wronskian_constant_value (fun rho => 1 - 2 * eta / rho)
+           F G F' G' F'' G''); assumption.
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
@@ -457,3 +541,6 @@ Print Assumptions s_wave_is_gamow_factor.
 Print Assumptions partial_wave_suppression.
 Print Assumptions semiclassical_correspondence.
 Print Assumptions coulomb_coeff_2_at_l0.
+Print Assumptions wronskian_constant_2nd_order.
+Print Assumptions wronskian_constant_value.
+Print Assumptions coulomb_wronskian_constant.
