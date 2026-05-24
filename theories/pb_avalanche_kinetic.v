@@ -1145,6 +1145,30 @@ Module KineticFramework (K : KINETIC_MODEL_PARAMS).
     rewrite sqrt_1. ring.
   Qed.
 
+  Definition reactivity_slowing (R_prim tau : R) : R :=
+    L_kin * sigma_v_kinetic (3 * R_prim) tau.
+
+  Theorem figure_of_merit_canonical :
+    forall R_prim n_B tau, 0 < R_prim -> 0 < tau ->
+      R_secondary_kinetic n_B (3 * R_prim) tau / R_prim
+      = 3 * n_B * tau * reactivity_slowing R_prim tau.
+  Proof.
+    intros R_prim n_B tau HR Htau.
+    rewrite (multiplication_factor_kinetic_eq_FoM R_prim n_B tau HR Htau).
+    unfold kinetic_figure_of_merit, reactivity_slowing. ring.
+  Qed.
+
+  Theorem figure_of_merit_on_steady_spectrum :
+    forall R_prim n_B tau, 0 < R_prim -> 0 < tau ->
+      is_derive (slowing_flux (3 * R_prim) tau) E_alpha_birth_MeV 0 /\
+      R_secondary_kinetic n_B (3 * R_prim) tau / R_prim
+      = 3 * n_B * tau * reactivity_slowing R_prim tau.
+  Proof.
+    intros R_prim n_B tau HR Htau. split.
+    - apply slowing_flux_steady_derivative; [ exact Htau | apply E_min_le_birth ].
+    - apply figure_of_merit_canonical; assumption.
+  Qed.
+
 End KineticFramework.
 
 (* ================================================================== *)
@@ -1239,6 +1263,8 @@ Print Assumptions ConstantKineticFramework.source_equals_sink.
 Print Assumptions ConstantKineticFramework.slowing_flux_steady_derivative.
 Print Assumptions ConstantKineticFramework.R_secondary_bilinear_factorization.
 Print Assumptions ConstantKineticFramework.multiplication_factor_kinetic_eq_FoM.
+Print Assumptions ConstantKineticFramework.figure_of_merit_canonical.
+Print Assumptions ConstantKineticFramework.figure_of_merit_on_steady_spectrum.
 Print Assumptions ConstantKineticFramework.kinetic_FoM_upper_bound.
 Print Assumptions ConstantKineticFramework.kinetic_no_avalanche.
 Print Assumptions ConstantKineticFramework.kinetic_FoM_sandwich.

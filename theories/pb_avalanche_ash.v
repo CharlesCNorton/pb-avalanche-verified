@@ -634,6 +634,131 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Picard iterates converge to the closed-form solution === *)
+(* ================================================================== *)
+
+Section PicardConvergence.
+
+  Variable R_primary tau_ash : R.
+  Hypothesis R_pos : 0 < R_primary.
+  Hypothesis tau_pos : 0 < tau_ash.
+
+  Lemma picard_e0_bound :
+    forall t, 0 <= t ->
+      Rabs (picard R_primary tau_ash 0 0 0 t - n_ash_solution R_primary tau_ash t)
+      <= R_primary * tau_ash.
+  Proof.
+    intros t Ht.
+    replace (picard R_primary tau_ash 0 0 0 t) with 0 by reflexivity.
+    rewrite Rminus_0_l, Rabs_Ropp.
+    rewrite Rabs_pos_eq
+      by (apply (n_ash_solution_nonneg R_primary tau_ash t R_pos tau_pos Ht)).
+    apply (n_ash_solution_bounded_by_eq R_primary tau_ash t R_pos tau_pos Ht).
+  Qed.
+
+  Lemma picard_geom_bound :
+    forall (T : R), 0 <= T -> T < tau_ash ->
+    forall n t, 0 <= t <= T ->
+      Rabs (picard R_primary tau_ash 0 0 n t - n_ash_solution R_primary tau_ash t)
+      <= (R_primary * tau_ash) * (T / tau_ash) ^ n.
+  Proof.
+    intros T HT0 HTtau n. induction n as [|n IH]; intros t [Ht0 HtT].
+    - simpl (( T / tau_ash) ^ 0). rewrite Rmult_1_r.
+      apply picard_e0_bound; exact Ht0.
+    - eapply Rle_trans.
+      { apply (picard_error_contraction R_primary tau_ash tau_pos n t Ht0). }
+      assert (Hc : 0 <= (R_primary * tau_ash) * (T / tau_ash) ^ n).
+      { apply Rmult_le_pos.
+        - apply Rlt_le, Rmult_lt_0_compat; assumption.
+        - apply pow_le. apply Rmult_le_pos;
+            [ lra | apply Rlt_le, Rinv_0_lt_compat; exact tau_pos ]. }
+      assert (Hint :
+        RInt (fun s => Rabs (picard R_primary tau_ash 0 0 n s
+                             - n_ash_solution R_primary tau_ash s)) 0 t
+        <= (R_primary * tau_ash) * (T / tau_ash) ^ n * t).
+      { replace ((R_primary * tau_ash) * (T / tau_ash) ^ n * t)
+          with (RInt (fun _ => (R_primary * tau_ash) * (T / tau_ash) ^ n) 0 t).
+        2:{ rewrite RInt_const. unfold scal; simpl; unfold mult; simpl. ring. }
+        apply RInt_le.
+        - exact Ht0.
+        - apply (ex_RInt_continuous (V := R_CompleteNormedModule)). intros s _.
+          apply (continuous_comp
+                   (fun s => picard R_primary tau_ash 0 0 n s
+                             - n_ash_solution R_primary tau_ash s) Rabs).
+          + apply (continuous_minus (V := R_NormedModule)
+                     (picard R_primary tau_ash 0 0 n)
+                     (n_ash_solution R_primary tau_ash)).
+            * apply (picard_cont R_primary tau_ash).
+            * apply (n_ash_solution_cont R_primary tau_ash tau_pos).
+          + apply (continuous_abs (K := R_AbsRing)).
+        - apply ex_RInt_const.
+        - intros s [Hs0 Hst]. apply IH. split; lra. }
+      apply Rle_trans with
+        (/ tau_ash * ((R_primary * tau_ash) * (T / tau_ash) ^ n * t)).
+      { apply Rmult_le_compat_l;
+          [ apply Rlt_le, Rinv_0_lt_compat; exact tau_pos | exact Hint ]. }
+      apply Rle_trans with
+        (/ tau_ash * ((R_primary * tau_ash) * (T / tau_ash) ^ n * T)).
+      { apply Rmult_le_compat_l;
+          [ apply Rlt_le, Rinv_0_lt_compat; exact tau_pos | ].
+        apply Rmult_le_compat_l; [ exact Hc | exact HtT ]. }
+      simpl (( T / tau_ash) ^ S n). set (qn := (T / tau_ash) ^ n).
+      apply Req_le. field. lra.
+  Qed.
+
+  Theorem picard_converges :
+    forall (T : R), 0 <= T -> T < tau_ash ->
+    forall t, 0 <= t <= T ->
+      is_lim_seq (fun n => picard R_primary tau_ash 0 0 n t)
+                 (n_ash_solution R_primary tau_ash t).
+  Proof.
+    intros T HT0 HTtau t Ht.
+    set (C := R_primary * tau_ash). set (q := T / tau_ash).
+    assert (Hq0 : 0 <= q)
+      by (unfold q; apply Rmult_le_pos;
+          [ lra | apply Rlt_le, Rinv_0_lt_compat; exact tau_pos ]).
+    assert (Hq1 : q < 1).
+    { unfold q. apply (Rmult_lt_reg_r tau_ash); [ exact tau_pos | ].
+      unfold Rdiv. rewrite Rmult_assoc, Rinv_l, Rmult_1_r by lra. lra. }
+    assert (HC : 0 <= C)
+      by (unfold C; apply Rlt_le, Rmult_lt_0_compat; assumption).
+    assert (Hlim0 :
+      is_lim_seq (fun n => picard R_primary tau_ash 0 0 n t
+                           - n_ash_solution R_primary tau_ash t) 0).
+    { apply (is_lim_seq_le_le (fun n => - C * q ^ n)
+               (fun n => picard R_primary tau_ash 0 0 n t
+                         - n_ash_solution R_primary tau_ash t)
+               (fun n => C * q ^ n)).
+      - intro n.
+        pose proof (picard_geom_bound T HT0 HTtau n t Ht) as Hb.
+        fold C q in Hb.
+        pose proof (Rle_abs (picard R_primary tau_ash 0 0 n t
+                             - n_ash_solution R_primary tau_ash t)) as Hu.
+        pose proof (Rle_abs (- (picard R_primary tau_ash 0 0 n t
+                             - n_ash_solution R_primary tau_ash t))) as Hl.
+        rewrite Rabs_Ropp in Hl. lra.
+      - replace (Finite 0) with (Rbar_mult (- C) (Finite 0)) by (simpl; f_equal; ring).
+        apply (is_lim_seq_scal_l (fun n => q ^ n) (- C) 0).
+        apply is_lim_seq_geom. rewrite Rabs_pos_eq; lra.
+      - replace (Finite 0) with (Rbar_mult C (Finite 0)) by (simpl; f_equal; ring).
+        apply (is_lim_seq_scal_l (fun n => q ^ n) C 0).
+        apply is_lim_seq_geom. rewrite Rabs_pos_eq; lra. }
+    apply (is_lim_seq_ext
+             (fun n => (picard R_primary tau_ash 0 0 n t
+                        - n_ash_solution R_primary tau_ash t)
+                       + n_ash_solution R_primary tau_ash t)).
+    { intro n. ring. }
+    apply (is_lim_seq_plus _ (fun _ => n_ash_solution R_primary tau_ash t)
+             0 (n_ash_solution R_primary tau_ash t)
+             (n_ash_solution R_primary tau_ash t)).
+    - exact Hlim0.
+    - apply is_lim_seq_const.
+    - unfold is_Rbar_plus; simpl; rewrite Rplus_0_l; reflexivity.
+  Qed.
+
+End PicardConvergence.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
@@ -650,6 +775,8 @@ Print Assumptions picard_matches_closed_forms.
 Print Assumptions n_ash_solution_fixed_point.
 Print Assumptions n_ash_solution_nonneg.
 Print Assumptions n_ash_solution_bounded_by_eq.
+Print Assumptions picard_geom_bound.
+Print Assumptions picard_converges.
 Print Assumptions picard_cont.
 Print Assumptions picard_error_one_step.
 Print Assumptions picard_error_contraction.

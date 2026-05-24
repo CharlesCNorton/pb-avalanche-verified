@@ -1498,6 +1498,118 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Evaluated cross-section error bars propagated to the integral === *)
+(* ================================================================== *)
+
+Fixpoint scale_table (s : R) (T : iaea_table) : iaea_table :=
+  match T with
+  | [] => []
+  | (e, v) :: rest => (e, s * v) :: scale_table s rest
+  end.
+
+Lemma trap_integral_scale : forall s T,
+  trap_integral (scale_table s T) = s * trap_integral T.
+Proof.
+  intros s T. induction T as [| [e1 v1] rest IH].
+  - simpl. ring.
+  - destruct rest as [| [e2 v2] rest'].
+    + simpl. ring.
+    + simpl. simpl in IH. rewrite IH. field.
+Qed.
+
+Lemma sorted_table_scale : forall s T,
+  sorted_table T -> sorted_table (scale_table s T).
+Proof.
+  intros s T. induction T as [| [e1 v1] rest IH]; intro Hs.
+  - exact I.
+  - destruct rest as [| [e2 v2] rest'].
+    + exact I.
+    + simpl in Hs. destruct Hs as [Hlt Hs'].
+      simpl. split; [ exact Hlt | exact (IH Hs') ].
+Qed.
+
+Inductive band_le : iaea_table -> iaea_table -> Prop :=
+| band_le_nil : band_le [] []
+| band_le_cons : forall e v1 v2 r1 r2,
+    v1 <= v2 -> band_le r1 r2 -> band_le ((e, v1) :: r1) ((e, v2) :: r2).
+
+Lemma band_le_sorted : forall T1 T2,
+  band_le T1 T2 -> sorted_table T1 -> sorted_table T2.
+Proof.
+  intros T1 T2 H. induction H as [| e v1 v2 r1 r2 Hv Hb IH]; intro Hs.
+  - exact I.
+  - destruct Hb as [| e' w1 w2 s1 s2 Hw Hb'].
+    + exact I.
+    + simpl in Hs. destruct Hs as [Hlt Hs'].
+      simpl. split; [ exact Hlt | exact (IH Hs') ].
+Qed.
+
+Lemma trap_integral_le : forall T1 T2,
+  band_le T1 T2 -> sorted_table T1 ->
+  trap_integral T1 <= trap_integral T2.
+Proof.
+  intros T1 T2 H. induction H as [| e v1 v2 r1 r2 Hv Hb IH]; intro Hs.
+  - simpl. lra.
+  - destruct Hb as [| e' w1 w2 s1 s2 Hw Hb'].
+    + simpl. lra.
+    + simpl in Hs. destruct Hs as [Hlt Hs'].
+      change (trap_integral ((e, v1) :: (e', w1) :: s1))
+        with ((v1 + w1) / 2 * (e' - e) + trap_integral ((e', w1) :: s1)).
+      change (trap_integral ((e, v2) :: (e', w2) :: s2))
+        with ((v2 + w2) / 2 * (e' - e) + trap_integral ((e', w2) :: s2)).
+      assert (Hterm : (v1 + w1) / 2 * (e' - e) <= (v2 + w2) / 2 * (e' - e))
+        by (apply Rmult_le_compat_r; lra).
+      assert (Hrest : trap_integral ((e', w1) :: s1) <= trap_integral ((e', w2) :: s2))
+        by (apply IH; exact Hs').
+      lra.
+Qed.
+
+Lemma max_abs_v_scale : forall s T,
+  0 <= s -> max_abs_v (scale_table s T) = s * max_abs_v T.
+Proof.
+  intros s T Hs. induction T as [| [e v] rest IH].
+  - simpl. ring.
+  - simpl. rewrite IH. rewrite (Rabs_mult s v).
+    rewrite (Rabs_pos_eq s Hs). apply RmaxRmult. exact Hs.
+Qed.
+
+Definition sw_rel_err : R := 2 / 10.
+
+(* For any evaluated cross-section table whose values lie within the +/-20%
+   measurement band around the Sikora-Weller central values at the same
+   energies, the resonance-window integral is pinned to the data-derived
+   band [(1 - err) I, (1 + err) I]; the endpoints are read from the data. *)
+Theorem sikora_weller_integral_error_band :
+  forall Tdata,
+    band_le (scale_table (1 - sw_rel_err) sikora_weller_pB_table) Tdata ->
+    band_le Tdata (scale_table (1 + sw_rel_err) sikora_weller_pB_table) ->
+    (1 - sw_rel_err) * trap_integral sikora_weller_pB_table
+      <= trap_integral Tdata
+      <= (1 + sw_rel_err) * trap_integral sikora_weller_pB_table.
+Proof.
+  intros Tdata Hlo Hhi.
+  assert (Hslo : sorted_table (scale_table (1 - sw_rel_err) sikora_weller_pB_table))
+    by (apply sorted_table_scale, sikora_weller_pB_table_sorted).
+  assert (Hsdata : sorted_table Tdata) by (apply (band_le_sorted _ _ Hlo); exact Hslo).
+  split.
+  - rewrite <- (trap_integral_scale (1 - sw_rel_err) sikora_weller_pB_table).
+    apply trap_integral_le; [ exact Hlo | exact Hslo ].
+  - rewrite <- (trap_integral_scale (1 + sw_rel_err) sikora_weller_pB_table).
+    apply trap_integral_le; [ exact Hhi | exact Hsdata ].
+Qed.
+
+(* The peak of the upper error band is the data peak (1.2 barn, the
+   0.675 MeV resonance) inflated by the measurement band. *)
+Theorem sikora_weller_peak_error_band :
+  max_abs_v (scale_table (1 + sw_rel_err) sikora_weller_pB_table)
+    <= (1 + sw_rel_err) * sikora_weller_M_inf.
+Proof.
+  rewrite (max_abs_v_scale (1 + sw_rel_err) sikora_weller_pB_table)
+    by (unfold sw_rel_err; lra).
+  apply Rmult_le_compat_l; [ unfold sw_rel_err; lra | exact max_abs_v_SW_value ].
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
@@ -1509,3 +1621,5 @@ Print Assumptions iaea_pB_sample_integral.
 Print Assumptions sikora_weller_pB_table_sorted.
 Print Assumptions sikora_weller_pB_integral.
 Print Assumptions sikora_weller_pB_integral_ext.
+Print Assumptions sikora_weller_integral_error_band.
+Print Assumptions sikora_weller_peak_error_band.

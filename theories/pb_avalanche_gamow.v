@@ -256,6 +256,126 @@ Proof.
     subst T2. apply Rle_refl.
 Qed.
 
+(* === The Kramers exponent: value of the integrand exponent at the peak === *)
+
+(* The Maxwellian-Gamow integrand is exp(-(b_G/sqrt E + E/T)). Evaluated at
+   the Gamow peak E_peak = (b_G T / 2)^{2/3}, the exponent attains the
+   Kramers value 3 (b_G^2 / 4T)^{1/3} via the saddle-point balance. *)
+Lemma kramers_exponent_value :
+  forall bG T, 0 < bG -> 0 < T ->
+    bG / sqrt (Rpower (bG * T / 2) (2 / 3)) + Rpower (bG * T / 2) (2 / 3) / T
+    = 3 * Rpower (bG * bG / (4 * T)) (1 / 3).
+Proof.
+  intros bG T HbG HT.
+  assert (Ha : 0 < bG * T / 2) by nra.
+  remember (Rpower (bG * T / 2) (1 / 3)) as r eqn:Hr.
+  assert (Hrpos : 0 < r) by (rewrite Hr; apply Rpower_pos; lra).
+  assert (Hr3 : r * r * r = bG * T / 2).
+  { rewrite Hr. do 2 (rewrite <- Rpower_plus).
+    replace (1/3 + 1/3 + 1/3) with 1 by lra. rewrite Rpower_1 by lra. reflexivity. }
+  assert (Hsqrt : sqrt (Rpower (bG * T / 2) (2 / 3)) = r).
+  { rewrite Hr. rewrite <- (Rpower_sqrt (Rpower (bG*T/2)(2/3))) by (apply Rpower_pos; lra).
+    rewrite Rpower_mult. f_equal. lra. }
+  assert (HE0 : Rpower (bG * T / 2) (2 / 3) = r * r).
+  { rewrite Hr. rewrite <- Rpower_plus. f_equal. lra. }
+  assert (Hy : 0 < r * r / T)
+    by (apply Rdiv_lt_0_compat; [apply Rmult_lt_0_compat; exact Hrpos | exact HT]).
+  assert (HbGr : bG = 2 * (r * r * r) / T) by (rewrite Hr3; field; lra).
+  assert (HRHS : Rpower (bG * bG / (4 * T)) (1 / 3) = r * r / T).
+  { assert (Hcube : bG * bG / (4 * T) = (r * r / T) ^ 3).
+    { rewrite HbGr. simpl. field. lra. }
+    rewrite Hcube. rewrite <- (Rpower_pow 3 (r*r/T) Hy). rewrite Rpower_mult.
+    replace (INR 3 * (1/3)) with 1 by (simpl; lra). apply Rpower_1; exact Hy. }
+  rewrite Hsqrt, HE0, HRHS, HbGr. field. split; lra.
+Qed.
+
+Definition kramers_exponent (T : R) : R := 3 * Rpower (b_G * b_G / (4 * T)) (1 / 3).
+
+Theorem gamow_peak_exponent_value :
+  forall T, 0 < T ->
+    gamow_factor (gamow_peak T) + gamow_peak T / T = kramers_exponent T.
+Proof.
+  intros T HT.
+  unfold gamow_factor, gamow_peak, kramers_exponent.
+  apply kramers_exponent_value; [ apply b_G_pos | exact HT ].
+Qed.
+
+(* E_peak^{3/2} = b_G T / 2, the stationary-point relation in product form. *)
+Lemma gamow_peak_E_sqrt :
+  forall T, 0 < T -> gamow_peak T * sqrt (gamow_peak T) = b_G * T / 2.
+Proof.
+  intros T HT. pose proof b_G_pos as Hb. assert (Ha : 0 < b_G * T / 2) by nra.
+  unfold gamow_peak.
+  rewrite <- (Rpower_sqrt (Rpower (b_G*T/2) (2/3))) by (apply Rpower_pos; lra).
+  rewrite Rpower_mult, <- Rpower_plus.
+  replace (2/3 + 2/3 * /2) with 1 by lra.
+  apply Rpower_1. lra.
+Qed.
+
+(* The Gamow peak is a genuine critical point of the integrand exponent
+   phi(E) = b_G / sqrt E + E / T: its derivative there vanishes. This is the
+   stationary-phase condition underlying the Laplace/Kramers analysis. *)
+Theorem gamow_exponent_critical :
+  forall T, 0 < T ->
+    is_derive (fun E => b_G / sqrt E + E / T) (gamow_peak T) 0.
+Proof.
+  intros T HT.
+  assert (HE0 : 0 < gamow_peak T) by (apply gamow_peak_pos; exact HT).
+  assert (Hs : 0 < sqrt (gamow_peak T)) by (apply sqrt_lt_R0; exact HE0).
+  assert (Hss : sqrt (gamow_peak T) * sqrt (gamow_peak T) = gamow_peak T)
+    by (apply sqrt_sqrt; lra).
+  assert (Hbg : b_G = 2 * (gamow_peak T * sqrt (gamow_peak T)) / T)
+    by (rewrite (gamow_peak_E_sqrt T HT); field; lra).
+  auto_derive.
+  - split; [ exact HE0 | split; [ apply Rgt_not_eq; exact Hs | exact I ] ].
+  - rewrite Hss, Hbg. field. repeat split; apply Rgt_not_eq; assumption.
+Qed.
+
+(* First derivative of the exponent in closed form. *)
+Lemma gamow_exponent_first_deriv :
+  forall T E, 0 < T -> 0 < E ->
+    is_derive (fun x => b_G / sqrt x + x / T) E (- b_G / (2 * E * sqrt E) + / T).
+Proof.
+  intros T E HT HE.
+  assert (Hs : 0 < sqrt E) by (apply sqrt_lt_R0; exact HE).
+  assert (Hss : sqrt E * sqrt E = E) by (apply sqrt_sqrt; lra).
+  auto_derive.
+  - repeat split; try assumption;
+      try (apply Rgt_not_eq; repeat apply Rmult_lt_0_compat; try assumption; try lra).
+  - set (s := sqrt E) in *. rewrite <- Hss. field.
+    repeat split; try assumption;
+      try (apply Rgt_not_eq; repeat apply Rmult_lt_0_compat; try assumption; try lra).
+Qed.
+
+(* Second derivative of the exponent in closed form. *)
+Lemma gamow_exponent_second_deriv :
+  forall T E, 0 < T -> 0 < E ->
+    is_derive (fun x => - b_G / (2 * x * sqrt x) + / T) E
+              (3 * b_G / (4 * E * E * sqrt E)).
+Proof.
+  intros T E HT HE.
+  assert (Hs : 0 < sqrt E) by (apply sqrt_lt_R0; exact HE).
+  assert (Hss : sqrt E * sqrt E = E) by (apply sqrt_sqrt; lra).
+  auto_derive.
+  - repeat split; try assumption;
+      try (apply Rgt_not_eq; repeat apply Rmult_lt_0_compat; try assumption; try lra).
+  - set (s := sqrt E) in *. rewrite <- Hss. field.
+    repeat split; try assumption;
+      try (apply Rgt_not_eq; repeat apply Rmult_lt_0_compat; try assumption; try lra).
+Qed.
+
+(* The curvature is everywhere positive: the exponent is strictly convex on
+   E > 0, so the vanishing first derivative at the Gamow peak marks the unique
+   minimum of the exponent, i.e. the unique maximum of the integrand. *)
+Theorem gamow_exponent_curvature_pos :
+  forall E, 0 < E -> 0 < 3 * b_G / (4 * E * E * sqrt E).
+Proof.
+  intros E HE. pose proof b_G_pos.
+  assert (Hs : 0 < sqrt E) by (apply sqrt_lt_R0; exact HE).
+  apply Rdiv_lt_0_compat;
+    [ lra | repeat apply Rmult_lt_0_compat; try assumption; lra ].
+Qed.
+
 (* ================================================================== *)
 (* === Quantum Coulomb functions and the Sommerfeld parameter === *)
 (* ================================================================== *)
@@ -783,3 +903,8 @@ Print Assumptions coulomb_coeff_2_at_l0.
 Print Assumptions wronskian_constant_2nd_order.
 Print Assumptions wronskian_constant_value.
 Print Assumptions coulomb_wronskian_constant.
+Print Assumptions kramers_exponent_value.
+Print Assumptions gamow_peak_exponent_value.
+Print Assumptions gamow_exponent_critical.
+Print Assumptions gamow_exponent_second_deriv.
+Print Assumptions gamow_exponent_curvature_pos.
