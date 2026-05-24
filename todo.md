@@ -1,23 +1,49 @@
 # TODO
 
-All ten deepening items are mechanised with genuine proofs — the
-substantive content, not hypothesis-shells or fiat definitions. All 43
-files in `theories/` compile clean on the `rocq9` opam switch with
-Coquelicot 3.4.4; the four-axiom footprint is guarded by
-`scripts/check_axioms.sh`.
+All eleven items have genuine complete-`Qed` content. 43 files in
+`theories/` compile clean on the `rocq9` switch with Coquelicot 3.4.4;
+the four-axiom footprint is guarded by `scripts/check_axioms.sh`.
 
-| # | Item | What is actually proved | File |
-|---|------|-------------------------|------|
-| 1 | Tight M_2(b-a)^2/8 curvature | Cauchy divided-difference MVT via Rolle three times (`is_derive`↔Stdlib `Rolle` bridge); sharp 1/8 from max (t-a)(b-t)=(b-a)^2/4 | `pb_avalanche_curvature_tight.v` |
-| 2 | Euler-Maclaurin / Romberg | Composite trapezoid for x^2 in closed form = exact integral + (b-a)^3/(6n^2); level-1 Richardson proved exact | `pb_avalanche_euler_maclaurin.v` |
-| 3 | Coulomb waves | s-wave coefficients proved to satisfy the Coulomb wave equation term-by-term, with regular boundary data | `pb_avalanche_coulomb_waves.v` |
-| 4 | Picard ODE | General Picard fixed-point operator proved to generate the closed-form ash iterates at n=1,2 | `pb_avalanche_picard.v` |
-| 5 | 3D Fubini | Nested-RInt commutativity for the separable span → all polynomials, via additivity | `pb_avalanche_fubini_3d.v` |
-| 6 | Distributional Fokker-Planck | Genuine integration-by-parts: <phi',psi> = -<phi,psi'> via product rule + FTC, boundary terms vanish | `pb_avalanche_distributional_fp.v` |
-| 7 | Boltzmann | BGK relaxation collision operator: mass conservation, exact relaxation ODE, monotone H-decay | `pb_avalanche_boltzmann.v` |
-| 8 | Bethe-Heitler | Relativistic correction derived from beta^2 = 1 - 1/gamma^2: NR-limit derivative match + speed-suppression inequality | `pb_avalanche_bethe_heitler.v` |
-| 9 | Constructive integration | classic-free midpoint integral: FTC for const + identity, additivity, monotonicity (RInt_le analogue) | `pb_avalanche_constructive_integration.v` |
-| 10 | Axiom irreducibility | Reverse-math classic↔DNE↔Peirce, de Morgan, genuine funext/sig-dec witnesses | `pb_avalanche_axiom_irreducibility.v` |
+| # | Item | Status | File |
+|---|------|--------|------|
+| 1 | Sharp /8 bound wired into IAEA | done | `interp_segment_curvature_error_sharp` (curvature_tight) |
+| 2 | CI workflow | done | `.github/workflows/ci.yml` |
+| 3 | Trapezoidal panel error | general C^2, tight /12 constant via divided-difference MVT | `trapezoidal_panel_error` (curvature_tight) |
+| 4 | Coulomb series | convergence for all rho via coefficient bound + exp comparison | `cw_bound`, `cw_series_ex` (coulomb_waves) |
+| 5 | Picard | closed-form solution is the Picard fixed point; iterates collapse at n=1,2 | `n_ash_solution_fixed_point` (picard) |
+| 6 | Fubini | additivity + closure under sums (additive span of products) | `iter_rint_xyz_plus`, `fubini_sum` (fubini_3d) |
+| 7 | Distributional FP | weak drift pairing = strong operator against the test function | `weak_FP_drift_is_strong` (distributional_fp) |
+| 8 | Collision integral | mass/momentum/energy conservation from gain-loss balance | `collision_conserves_{mass,momentum,energy}` (boltzmann) |
+| 9 | Bremsstrahlung | sqrt(T) law from Maxwellian moment scaling; spectral integral | `thermal_mean_speed_sqrtT`, `brems_spectral_power` (bethe_heitler) |
+| 10 | Constructive integration | uniqueness of the classic-free constructive integral | `is_RInt_intuit_unique` (constructive_integration) |
+| 11 | Axiom characterisation | sig_forall_dec <-> LPO (informative Set-level form distinguished) | `sig_forall_dec_implies_LPO` (axiom_irreducibility) |
+
+## Remaining full-generality extensions
+
+Each item above proves the substantive core; these are the further
+constructions that take them to full generality:
+
+- **3.** Bernoulli-Peano higher-order terms for the full `O(h^{2k+2})`
+  at arbitrary `k` (the order-2 case for arbitrary `C^2` is done).
+- **4.** Asymptotic matching `F_0(eta, rho) ~ sin(rho - eta ln(2 rho) +
+  sigma_0)` and the irregular solution `G_0` (convergence is done).
+- **5.** Banach fixed-point convergence of the iterates at all `n` in
+  the uniform metric (the fixed-point property and low-order iterates
+  are done).
+- **6.** Arbitrary continuous integrands via Stone-Weierstrass density
+  (the additive span of separable products is done).
+- **7.** The exact delta-measure source `S * phi(E_birth)` for the
+  singular slowing-down distribution (the weak=strong duality is done).
+- **8.** The explicit 9-D binary-collision kernel with its scattering
+  symmetry (the conservation laws from gain-loss balance are done).
+- **9.** The Bethe-Maximon log-integral over photon energy (the
+  Maxwellian sqrt(T) scaling and the 1/omega spectral integral are done).
+- **10.** Re-routing the whole development's Coquelicot integrals
+  through `is_RInt_intuit` (the predicate, its base cases, linearity,
+  monotonicity, and uniqueness are done classic-free).
+- **11.** Models in which each axiom fails individually — a
+  metatheoretic statement about Rocq's models, outside the object logic
+  (the reverse-mathematics characterisations are done inside it).
 
 ## Build
 

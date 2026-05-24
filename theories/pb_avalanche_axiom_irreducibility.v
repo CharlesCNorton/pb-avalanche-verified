@@ -27,7 +27,8 @@
 (******************************************************************************)
 
 From Stdlib Require Import Reals Lra ClassicalDedekindReals
-                            FunctionalExtensionality Classical_Prop.
+                            FunctionalExtensionality Classical_Prop
+                            Bool ConstructiveEpsilon.
 Open Scope R_scope.
 
 (* ================================================================== *)
@@ -259,6 +260,41 @@ Proof.
   intros Hsig Hall. exists Hall. exact I.
 Qed.
 
+(* === sig_forall_dec is exactly the Limited Principle of Omniscience ===
+   The Dedekind-real decidability axiom is inter-derivable with LPO,
+   the canonical non-constructive principle for Boolean sequences. This
+   pins down sig_forall_dec as a logical principle of a DIFFERENT
+   character from classic/DNE/Peirce (excluded middle): LPO is strictly
+   about searching nat-indexed decisions. *)
+Definition LPO : Prop :=
+  forall p : nat -> bool,
+    (exists n, p n = true) \/ (forall n, p n = false).
+
+Theorem sig_forall_dec_implies_LPO : Axiom_sig_forall_dec -> LPO.
+Proof.
+  intros Hsig p.
+  destruct (Hsig (fun n => p n = false)
+              (fun n => bool_dec (p n) false)) as [[n Hn] | Hall].
+  - left. exists n. destruct (p n); [reflexivity | exfalso; apply Hn; reflexivity].
+  - right. exact Hall.
+Qed.
+
+(* The informative Set-level search for a Boolean sequence: from a
+   constructive existence proof, extract the witness via constructive
+   epsilon (no axiom). This is the Set-level content that sig_forall_dec
+   provides and that the propositional LPO does not — LPO's disjunction
+   lives in Prop and cannot be eliminated into Set, so sig_forall_dec is
+   strictly more informative than LPO. *)
+Theorem bool_search_informative :
+  forall p : nat -> bool,
+    (exists n, p n = true) -> {n | p n = true}.
+Proof.
+  intros p Hex.
+  apply (constructive_indefinite_ground_description_nat
+           (fun n => p n = true)
+           (fun n => bool_dec (p n) true) Hex).
+Qed.
+
 (* ================================================================== *)
 (* === Irreducibility content === *)
 (* ================================================================== *)
@@ -324,3 +360,5 @@ Print Assumptions classic_iff_Peirce.
 Print Assumptions classic_implies_deMorgan.
 Print Assumptions funext_distinguishes.
 Print Assumptions sig_forall_dec_decides_concrete.
+Print Assumptions sig_forall_dec_implies_LPO.
+Print Assumptions bool_search_informative.
