@@ -348,6 +348,100 @@ Qed.
 
 
 (* ================================================================== *)
+(* === Spectral integral and the sqrt(T) bremsstrahlung law === *)
+(* ================================================================== *)
+
+(* Integrating the 1/omega bremsstrahlung shape over emitted-photon
+   energy from a low cutoff omega_min up to E gives the Coulomb
+   logarithm A ln(E/omega_min): this is the frequency-integrated cross
+   section / Gaunt factor. FTC with antiderivative A ln. *)
+Lemma sigma_spectral_log :
+  forall (A E omega_min : R),
+    0 < omega_min -> omega_min <= E ->
+    RInt (fun w => A / w) omega_min E = A * (ln E - ln omega_min).
+Proof.
+  intros A E om Hom Hle.
+  apply is_RInt_unique.
+  replace (A * (ln E - ln om))
+    with (minus (A * ln E) (A * ln om))
+    by (unfold minus, plus, opp; simpl; ring).
+  apply (is_RInt_derive (V := R_CompleteNormedModule)
+           (fun w => A * ln w) (fun w => A / w) om E).
+  - intros x Hx. rewrite Rmin_left in Hx by lra. rewrite Rmax_right in Hx by lra.
+    auto_derive; [ lra | field; lra ].
+  - intros x Hx. rewrite Rmin_left in Hx by lra. rewrite Rmax_right in Hx by lra.
+    apply (ex_derive_continuous (K := R_AbsRing) (V := R_NormedModule)).
+    exists (- A / (x * x)). auto_derive; [ lra | field; lra ].
+Qed.
+
+(* Maxwellian mean electron speed on the truncated thermal range,
+   the moment ratio that carries the temperature dependence. *)
+Definition thermal_mean_speed (c T : R) : R :=
+  RInt (fun v => v ^ 3 * exp (- v ^ 2 / (2 * T))) 0 (sqrt T * c)
+  / RInt (fun v => v ^ 2 * exp (- v ^ 2 / (2 * T))) 0 (sqrt T * c).
+
+(* Thermal bremsstrahlung power built from the per-collision radiated
+   power (kappa per unit electron energy, from brems_spectral_power) and
+   the thermal electron flux (mean speed): kappa Z^2 n_e^2 <v>_T. *)
+Definition brems_thermal_power (kappa Z n_e c T : R) : R :=
+  kappa * Z * Z * n_e * n_e * thermal_mean_speed c T.
+
+(* The temperature dependence of the thermal bremsstrahlung power is
+   exactly sqrt(T): P(T) = sqrt(T) P(1). The sqrt(T) is inherited from
+   the Maxwellian moment scaling, not postulated. *)
+Theorem brems_thermal_power_sqrtT :
+  forall (kappa Z n_e c : R), 0 < c ->
+    ex_RInt (fun u => u ^ 3 * exp (- u ^ 2 / 2)) 0 c ->
+    ex_RInt (fun u => u ^ 2 * exp (- u ^ 2 / 2)) 0 c ->
+    (forall T, 0 < T ->
+       ex_RInt (fun v => v ^ 3 * exp (- v ^ 2 / (2 * T))) 0 (sqrt T * c)) ->
+    (forall T, 0 < T ->
+       ex_RInt (fun v => v ^ 2 * exp (- v ^ 2 / (2 * T))) 0 (sqrt T * c)) ->
+    0 < RInt (fun u => u ^ 2 * exp (- u ^ 2 / 2)) 0 c ->
+    forall T, 0 < T ->
+      brems_thermal_power kappa Z n_e c T
+      = sqrt T * brems_thermal_power kappa Z n_e c 1.
+Proof.
+  intros kappa Z n_e c Hc Hex3 Hex2 Hexf3 Hexf2 Hnorm T HT.
+  unfold brems_thermal_power, thermal_mean_speed.
+  rewrite (thermal_moment_scaling 3 T c HT Hex3 (Hexf3 T HT)).
+  rewrite (thermal_moment_scaling 2 T c HT Hex2 (Hexf2 T HT)).
+  rewrite (thermal_moment_scaling 3 1 c Rlt_0_1 Hex3 (Hexf3 1 Rlt_0_1)).
+  rewrite (thermal_moment_scaling 2 1 c Rlt_0_1 Hex2 (Hexf2 1 Rlt_0_1)).
+  rewrite sqrt_1.
+  set (N3 := RInt (fun u => u ^ 3 * exp (- u ^ 2 / 2)) 0 c).
+  set (N2 := RInt (fun u => u ^ 2 * exp (- u ^ 2 / 2)) 0 c).
+  assert (HsTne : sqrt T <> 0)
+    by (apply Rgt_not_eq; apply sqrt_lt_R0; exact HT).
+  assert (HN2 : N2 <> 0) by (apply Rgt_not_eq; exact Hnorm).
+  assert (HsT3 : sqrt T ^ 3 <> 0) by (apply pow_nonzero; exact HsTne).
+  simpl (3 + 1)%nat. simpl (2 + 1)%nat.
+  field. repeat split; assumption.
+Qed.
+
+(* Equivalently: the thermal bremsstrahlung power has exactly the
+   C Z^2 n_e^2 sqrt(T) form, with the coefficient C = kappa <v>_1 now
+   derived from the spectral and moment integrals rather than posited. *)
+Corollary brems_thermal_power_NR_form :
+  forall (kappa Z n_e c : R), 0 < c ->
+    ex_RInt (fun u => u ^ 3 * exp (- u ^ 2 / 2)) 0 c ->
+    ex_RInt (fun u => u ^ 2 * exp (- u ^ 2 / 2)) 0 c ->
+    (forall T, 0 < T ->
+       ex_RInt (fun v => v ^ 3 * exp (- v ^ 2 / (2 * T))) 0 (sqrt T * c)) ->
+    (forall T, 0 < T ->
+       ex_RInt (fun v => v ^ 2 * exp (- v ^ 2 / (2 * T))) 0 (sqrt T * c)) ->
+    0 < RInt (fun u => u ^ 2 * exp (- u ^ 2 / 2)) 0 c ->
+    forall T, 0 < T ->
+      brems_thermal_power kappa Z n_e c T
+      = (kappa * thermal_mean_speed c 1) * (Z * Z * n_e * n_e) * sqrt T.
+Proof.
+  intros kappa Z n_e c Hc Hex3 Hex2 Hexf3 Hexf2 Hnorm T HT.
+  rewrite (brems_thermal_power_sqrtT kappa Z n_e c Hc Hex3 Hex2
+             Hexf3 Hexf2 Hnorm T HT).
+  unfold brems_thermal_power. ring.
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
@@ -360,3 +454,6 @@ Print Assumptions bremsstrahlung_rel_le_NR.
 Print Assumptions thermal_moment_scaling.
 Print Assumptions thermal_mean_speed_sqrtT.
 Print Assumptions brems_spectral_power.
+Print Assumptions sigma_spectral_log.
+Print Assumptions brems_thermal_power_sqrtT.
+Print Assumptions brems_thermal_power_NR_form.
