@@ -569,6 +569,40 @@ Proof.
 Qed.
 
 
+(* The zero integrand: all orderings give 0. *)
+Lemma iter_rint_xyz_zero : forall a b c d e g,
+  iter_rint_xyz (fun _ _ _ => 0) a b c d e g = 0.
+Proof.
+  intros a b c d e g. unfold iter_rint_xyz.
+  transitivity (RInt (fun _ : R => RInt (fun _ : R => 0) c d) a b).
+  { apply RInt_ext. intros x _. apply RInt_ext. intros y _.
+    rewrite RInt_const. unfold scal; simpl; unfold mult; simpl. ring. }
+  transitivity (RInt (fun _ : R => 0) a b).
+  { apply RInt_ext. intros x _. rewrite RInt_const.
+    unfold scal; simpl; unfold mult; simpl. ring. }
+  rewrite RInt_const. unfold scal; simpl; unfold mult; simpl. ring.
+Qed.
+
+Lemma iter_rint_yxz_zero : forall a b c d e g,
+  iter_rint_yxz (fun _ _ _ => 0) a b c d e g = 0.
+Proof.
+  intros a b c d e g. unfold iter_rint_yxz.
+  transitivity (RInt (fun _ : R => RInt (fun _ : R => 0) a b) c d).
+  { apply RInt_ext. intros y _. apply RInt_ext. intros x _.
+    rewrite RInt_const. unfold scal; simpl; unfold mult; simpl. ring. }
+  transitivity (RInt (fun _ : R => 0) c d).
+  { apply RInt_ext. intros y _. rewrite RInt_const.
+    unfold scal; simpl; unfold mult; simpl. ring. }
+  rewrite RInt_const. unfold scal; simpl; unfold mult; simpl. ring.
+Qed.
+
+Theorem fubini_zero : forall a b c d e g,
+  iter_rint_xyz (fun _ _ _ => 0) a b c d e g
+  = iter_rint_yxz (fun _ _ _ => 0) a b c d e g.
+Proof.
+  intros. rewrite iter_rint_xyz_zero, iter_rint_yxz_zero. reflexivity.
+Qed.
+
 (* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
@@ -583,3 +617,4 @@ Print Assumptions M_volumetric_3D_order_independent.
 Print Assumptions M_volumetric_3D_positive.
 Print Assumptions iter_rint_xyz_plus.
 Print Assumptions fubini_sum.
+Print Assumptions fubini_zero.
