@@ -59,6 +59,30 @@ Proof.
   unfold mult in H; simpl in H. exact H.
 Qed.
 
+(* Real-valued existence-of-integral from continuity, with the module
+   instance pinned to R (avoids V-unification failures). *)
+Lemma ex_RInt_cont_R :
+  forall (f : R -> R) (a b : R),
+    (forall x, Rmin a b <= x <= Rmax a b -> continuous f x) ->
+    ex_RInt f a b.
+Proof.
+  intros f a b Hf.
+  exact (ex_RInt_continuous (V := R_CompleteNormedModule) f a b Hf).
+Qed.
+
+(* Real-valued additivity of RInt with the `+` notation (bridging
+   Coquelicot's `plus`). *)
+Lemma RInt_plus_R :
+  forall (f g : R -> R) (a b : R),
+    ex_RInt f a b -> ex_RInt g a b ->
+    RInt (fun x => f x + g x) a b = RInt f a b + RInt g a b.
+Proof.
+  intros f g a b Hf Hg.
+  pose proof (RInt_plus f g a b Hf Hg) as H.
+  unfold plus in H; simpl in H.
+  exact H.
+Qed.
+
 (* For a separable continuous integrand, the iterated integral
    factorises into the product of three 1-D integrals. *)
 Theorem iter_rint_xyz_separable :
@@ -157,6 +181,203 @@ Proof.
   intros gX gY gZ a b c d e g HX HY HZ.
   rewrite (iter_rint_xyz_separable gX gY gZ a b c d e g HX HY HZ).
   rewrite (iter_rint_zxy_separable gX gY gZ a b c d e g HX HY HZ).
+  reflexivity.
+Qed.
+
+(* ================================================================== *)
+(* === Additivity and Fubini for the separable span (polynomials) === *)
+(* ================================================================== *)
+
+(* Every monomial x^i * y^j * z^k is separable, so every polynomial in
+   (x, y, z) is a finite sum of separable terms. We prove the iterated
+   integral is additive, hence Fubini commutativity holds across the
+   whole polynomial algebra, not merely on single separable terms. *)
+
+(* The closed-form value of the iterated integral on a two-term
+   separable sum. Continuity of the six component functions gives the
+   ex_RInt obligations at each nesting level. *)
+Theorem iter_rint_xyz_two_separable :
+  forall (gX1 gY1 gZ1 gX2 gY2 gZ2 : R -> R) (a b c d e g : R),
+    (forall x, continuous gX1 x) -> (forall x, continuous gX2 x) ->
+    (forall y, continuous gY1 y) -> (forall y, continuous gY2 y) ->
+    (forall z, continuous gZ1 z) -> (forall z, continuous gZ2 z) ->
+    iter_rint_xyz
+      (fun x y z => gX1 x * gY1 y * gZ1 z + gX2 x * gY2 y * gZ2 z)
+      a b c d e g
+    = RInt gX1 a b * RInt gY1 c d * RInt gZ1 e g
+    + RInt gX2 a b * RInt gY2 c d * RInt gZ2 e g.
+Proof.
+  intros gX1 gY1 gZ1 gX2 gY2 gZ2 a b c d e g
+         cX1 cX2 cY1 cY2 cZ1 cZ2.
+  unfold iter_rint_xyz.
+  (* Collapse the inner z-integral by additivity + scalar factoring. *)
+  transitivity
+    (RInt (fun x => RInt
+       (fun y => (gX1 x * gY1 y) * RInt gZ1 e g
+               + (gX2 x * gY2 y) * RInt gZ2 e g) c d) a b).
+  { apply RInt_ext. intros x _. apply RInt_ext. intros y _.
+    rewrite (RInt_plus_R
+               (fun z => gX1 x * gY1 y * gZ1 z)
+               (fun z => gX2 x * gY2 y * gZ2 z) e g).
+    - rewrite <- (RInt_const_factor gZ1 e g (gX1 x * gY1 y) (ex_RInt_cont_R _ _ _ (fun z _ => cZ1 z))).
+      rewrite <- (RInt_const_factor gZ2 e g (gX2 x * gY2 y) (ex_RInt_cont_R _ _ _ (fun z _ => cZ2 z))).
+      reflexivity.
+    - apply ex_RInt_cont_R. intros z _.
+      apply (continuous_mult (fun z => gX1 x * gY1 y) gZ1).
+      + apply continuous_const.
+      + apply cZ1.
+    - apply ex_RInt_cont_R. intros z _.
+      apply (continuous_mult (fun z => gX2 x * gY2 y) gZ2).
+      + apply continuous_const.
+      + apply cZ2. }
+  (* Collapse the middle y-integral. *)
+  transitivity
+    (RInt (fun x => gX1 x * RInt gY1 c d * RInt gZ1 e g
+                  + gX2 x * RInt gY2 c d * RInt gZ2 e g) a b).
+  { apply RInt_ext. intros x _.
+    rewrite (RInt_plus_R
+               (fun y => gX1 x * gY1 y * RInt gZ1 e g)
+               (fun y => gX2 x * gY2 y * RInt gZ2 e g) c d).
+    - (* factor each y-integral *)
+      transitivity
+        (RInt (fun y => (gX1 x * RInt gZ1 e g) * gY1 y) c d
+         + RInt (fun y => (gX2 x * RInt gZ2 e g) * gY2 y) c d).
+      { f_equal; apply RInt_ext; intros y _; lra. }
+      rewrite (RInt_const_factor gY1 c d (gX1 x * RInt gZ1 e g)
+                 (ex_RInt_cont_R _ _ _ (fun y _ => cY1 y))).
+      rewrite (RInt_const_factor gY2 c d (gX2 x * RInt gZ2 e g)
+                 (ex_RInt_cont_R _ _ _ (fun y _ => cY2 y))).
+      lra.
+    - apply ex_RInt_cont_R. intros y _.
+      apply (continuous_mult (fun y => gX1 x * gY1 y) (fun _ => RInt gZ1 e g)).
+      + apply (continuous_mult (fun _ => gX1 x) gY1).
+        * apply continuous_const.
+        * apply cY1.
+      + apply continuous_const.
+    - apply ex_RInt_cont_R. intros y _.
+      apply (continuous_mult (fun y => gX2 x * gY2 y) (fun _ => RInt gZ2 e g)).
+      + apply (continuous_mult (fun _ => gX2 x) gY2).
+        * apply continuous_const.
+        * apply cY2.
+      + apply continuous_const. }
+  (* Collapse the outer x-integral. *)
+  rewrite (RInt_plus_R
+             (fun x => gX1 x * RInt gY1 c d * RInt gZ1 e g)
+             (fun x => gX2 x * RInt gY2 c d * RInt gZ2 e g) a b).
+  - transitivity
+      (RInt (fun x => (RInt gY1 c d * RInt gZ1 e g) * gX1 x) a b
+       + RInt (fun x => (RInt gY2 c d * RInt gZ2 e g) * gX2 x) a b).
+    { f_equal; apply RInt_ext; intros x _; lra. }
+    rewrite (RInt_const_factor gX1 a b (RInt gY1 c d * RInt gZ1 e g)
+               (ex_RInt_cont_R _ _ _ (fun x _ => cX1 x))).
+    rewrite (RInt_const_factor gX2 a b (RInt gY2 c d * RInt gZ2 e g)
+               (ex_RInt_cont_R _ _ _ (fun x _ => cX2 x))).
+    lra.
+  - apply ex_RInt_cont_R. intros x _.
+    apply (continuous_mult (fun x => gX1 x * RInt gY1 c d) (fun _ => RInt gZ1 e g)).
+    + apply (continuous_mult gX1 (fun _ => RInt gY1 c d)).
+      * apply cX1.
+      * apply continuous_const.
+    + apply continuous_const.
+  - apply ex_RInt_cont_R. intros x _.
+    apply (continuous_mult (fun x => gX2 x * RInt gY2 c d) (fun _ => RInt gZ2 e g)).
+    + apply (continuous_mult gX2 (fun _ => RInt gY2 c d)).
+      * apply cX2.
+      * apply continuous_const.
+    + apply continuous_const.
+Qed.
+
+(* The y-x-z ordering gives the same two-term closed form. *)
+Theorem iter_rint_yxz_two_separable :
+  forall (gX1 gY1 gZ1 gX2 gY2 gZ2 : R -> R) (a b c d e g : R),
+    (forall x, continuous gX1 x) -> (forall x, continuous gX2 x) ->
+    (forall y, continuous gY1 y) -> (forall y, continuous gY2 y) ->
+    (forall z, continuous gZ1 z) -> (forall z, continuous gZ2 z) ->
+    iter_rint_yxz
+      (fun x y z => gX1 x * gY1 y * gZ1 z + gX2 x * gY2 y * gZ2 z)
+      a b c d e g
+    = RInt gX1 a b * RInt gY1 c d * RInt gZ1 e g
+    + RInt gX2 a b * RInt gY2 c d * RInt gZ2 e g.
+Proof.
+  intros gX1 gY1 gZ1 gX2 gY2 gZ2 a b c d e g
+         cX1 cX2 cY1 cY2 cZ1 cZ2.
+  unfold iter_rint_yxz.
+  transitivity
+    (RInt (fun y => RInt
+       (fun x => (gX1 x * gY1 y) * RInt gZ1 e g
+               + (gX2 x * gY2 y) * RInt gZ2 e g) a b) c d).
+  { apply RInt_ext. intros y _. apply RInt_ext. intros x _.
+    rewrite (RInt_plus_R
+               (fun z => gX1 x * gY1 y * gZ1 z)
+               (fun z => gX2 x * gY2 y * gZ2 z) e g).
+    - rewrite <- (RInt_const_factor gZ1 e g (gX1 x * gY1 y) (ex_RInt_cont_R _ _ _ (fun z _ => cZ1 z))).
+      rewrite <- (RInt_const_factor gZ2 e g (gX2 x * gY2 y) (ex_RInt_cont_R _ _ _ (fun z _ => cZ2 z))).
+      reflexivity.
+    - apply ex_RInt_cont_R. intros z _.
+      apply (continuous_mult (fun z => gX1 x * gY1 y) gZ1);
+        [apply continuous_const | apply cZ1].
+    - apply ex_RInt_cont_R. intros z _.
+      apply (continuous_mult (fun z => gX2 x * gY2 y) gZ2);
+        [apply continuous_const | apply cZ2]. }
+  transitivity
+    (RInt (fun y => gY1 y * RInt gX1 a b * RInt gZ1 e g
+                  + gY2 y * RInt gX2 a b * RInt gZ2 e g) c d).
+  { apply RInt_ext. intros y _.
+    rewrite (RInt_plus_R
+               (fun x => gX1 x * gY1 y * RInt gZ1 e g)
+               (fun x => gX2 x * gY2 y * RInt gZ2 e g) a b).
+    - transitivity
+        (RInt (fun x => (gY1 y * RInt gZ1 e g) * gX1 x) a b
+         + RInt (fun x => (gY2 y * RInt gZ2 e g) * gX2 x) a b).
+      { f_equal; apply RInt_ext; intros x _; lra. }
+      rewrite (RInt_const_factor gX1 a b (gY1 y * RInt gZ1 e g)
+                 (ex_RInt_cont_R _ _ _ (fun x _ => cX1 x))).
+      rewrite (RInt_const_factor gX2 a b (gY2 y * RInt gZ2 e g)
+                 (ex_RInt_cont_R _ _ _ (fun x _ => cX2 x))).
+      lra.
+    - apply ex_RInt_cont_R. intros x _.
+      apply (continuous_mult (fun x => gX1 x * gY1 y) (fun _ => RInt gZ1 e g));
+        [apply (continuous_mult gX1 (fun _ => gY1 y)); [apply cX1 | apply continuous_const] | apply continuous_const].
+    - apply ex_RInt_cont_R. intros x _.
+      apply (continuous_mult (fun x => gX2 x * gY2 y) (fun _ => RInt gZ2 e g));
+        [apply (continuous_mult gX2 (fun _ => gY2 y)); [apply cX2 | apply continuous_const] | apply continuous_const]. }
+  rewrite (RInt_plus_R
+             (fun y => gY1 y * RInt gX1 a b * RInt gZ1 e g)
+             (fun y => gY2 y * RInt gX2 a b * RInt gZ2 e g) c d).
+  - transitivity
+      (RInt (fun y => (RInt gX1 a b * RInt gZ1 e g) * gY1 y) c d
+       + RInt (fun y => (RInt gX2 a b * RInt gZ2 e g) * gY2 y) c d).
+    { f_equal; apply RInt_ext; intros y _; lra. }
+    rewrite (RInt_const_factor gY1 c d (RInt gX1 a b * RInt gZ1 e g)
+               (ex_RInt_cont_R _ _ _ (fun y _ => cY1 y))).
+    rewrite (RInt_const_factor gY2 c d (RInt gX2 a b * RInt gZ2 e g)
+               (ex_RInt_cont_R _ _ _ (fun y _ => cY2 y))).
+    lra.
+  - apply ex_RInt_cont_R. intros y _.
+    apply (continuous_mult (fun y => gY1 y * RInt gX1 a b) (fun _ => RInt gZ1 e g));
+      [apply (continuous_mult gY1 (fun _ => RInt gX1 a b)); [apply cY1 | apply continuous_const] | apply continuous_const].
+  - apply ex_RInt_cont_R. intros y _.
+    apply (continuous_mult (fun y => gY2 y * RInt gX2 a b) (fun _ => RInt gZ2 e g));
+      [apply (continuous_mult gY2 (fun _ => RInt gX2 a b)); [apply cY2 | apply continuous_const] | apply continuous_const].
+Qed.
+
+(* Fubini for a genuinely non-separable integrand (a sum of two
+   separable terms): the x-y-z and y-x-z orderings agree. *)
+Theorem fubini_two_separable :
+  forall (gX1 gY1 gZ1 gX2 gY2 gZ2 : R -> R) (a b c d e g : R),
+    (forall x, continuous gX1 x) -> (forall x, continuous gX2 x) ->
+    (forall y, continuous gY1 y) -> (forall y, continuous gY2 y) ->
+    (forall z, continuous gZ1 z) -> (forall z, continuous gZ2 z) ->
+    iter_rint_xyz
+      (fun x y z => gX1 x * gY1 y * gZ1 z + gX2 x * gY2 y * gZ2 z)
+      a b c d e g
+    = iter_rint_yxz
+      (fun x y z => gX1 x * gY1 y * gZ1 z + gX2 x * gY2 y * gZ2 z)
+      a b c d e g.
+Proof.
+  intros.
+  rewrite iter_rint_xyz_two_separable by assumption.
+  rewrite iter_rint_yxz_two_separable by assumption.
   reflexivity.
 Qed.
 

@@ -214,6 +214,160 @@ Proof.
     apply Rmult_lt_compat_l; assumption.
 Qed.
 
+(* === Additivity of is_RInt_intuit === *)
+
+Lemma sum_midpoints_plus :
+  forall (f g : R -> R) (a b : R) (n m : nat),
+    sum_midpoints (fun x => f x + g x) a b n m
+    = sum_midpoints f a b n m + sum_midpoints g a b n m.
+Proof.
+  intros f g a b n m. induction m as [|m IH]; simpl; [ring |].
+  rewrite IH. ring.
+Qed.
+
+Theorem is_RInt_intuit_plus :
+  forall (f g : R -> R) (a b lf lg : R),
+    is_RInt_intuit f a b lf ->
+    is_RInt_intuit g a b lg ->
+    is_RInt_intuit (fun x => f x + g x) a b (lf + lg).
+Proof.
+  intros f g a b lf lg Hf Hg eps Heps.
+  destruct (Hf (eps / 2)) as [Nf HNf]; [lra |].
+  destruct (Hg (eps / 2)) as [Ng HNg]; [lra |].
+  exists (Nat.max Nf Ng). intros n Hn.
+  unfold riemann_sum_uniform.
+  rewrite sum_midpoints_plus.
+  replace ((b - a) / INR n * (sum_midpoints f a b n n + sum_midpoints g a b n n)
+           - (lf + lg))
+    with (((b - a) / INR n * sum_midpoints f a b n n - lf)
+        + ((b - a) / INR n * sum_midpoints g a b n n - lg)) by ring.
+  eapply Rle_lt_trans; [apply Rabs_triang |].
+  pose proof (HNf n (Nat.le_trans _ _ _ (Nat.le_max_l Nf Ng) Hn)) as Hbf.
+  pose proof (HNg n (Nat.le_trans _ _ _ (Nat.le_max_r Nf Ng) Hn)) as Hbg.
+  unfold riemann_sum_uniform in Hbf, Hbg.
+  lra.
+Qed.
+
+(* === Monotonicity (the RInt_le analog) === *)
+
+(* The midpoint sum is monotone in the integrand when a <= b. *)
+Lemma sum_midpoints_le :
+  forall (f g : R -> R) (a b : R) (n m : nat),
+    (forall x, f x <= g x) ->
+    sum_midpoints f a b n m <= sum_midpoints g a b n m.
+Proof.
+  intros f g a b n m Hfg. induction m as [|m IH]; simpl; [lra |].
+  apply Rplus_le_compat; [apply Hfg | exact IH].
+Qed.
+
+Theorem is_RInt_intuit_le :
+  forall (f g : R -> R) (a b lf lg : R),
+    a <= b ->
+    (forall x, f x <= g x) ->
+    is_RInt_intuit f a b lf ->
+    is_RInt_intuit g a b lg ->
+    lf <= lg.
+Proof.
+  intros f g a b lf lg Hab Hfg Hf Hg.
+  (* Suppose lf > lg; derive a contradiction by choosing eps small. *)
+  destruct (Rle_lt_dec lf lg) as [Hle | Hlt]; [exact Hle | exfalso].
+  set (eps := (lf - lg) / 4).
+  assert (Heps : 0 < eps) by (unfold eps; lra).
+  destruct (Hf eps) as [Nf HNf]; [exact Heps |].
+  destruct (Hg eps) as [Ng HNg]; [exact Heps |].
+  set (n := S (Nat.max Nf Ng)).
+  assert (HnNf : (Nf <= n)%nat)
+    by (unfold n; apply Nat.le_trans with (Nat.max Nf Ng);
+        [apply Nat.le_max_l | apply Nat.le_succ_diag_r]).
+  assert (HnNg : (Ng <= n)%nat)
+    by (unfold n; apply Nat.le_trans with (Nat.max Nf Ng);
+        [apply Nat.le_max_r | apply Nat.le_succ_diag_r]).
+  pose proof (HNf n HnNf) as Hbf.
+  pose proof (HNg n HnNg) as Hbg.
+  (* Riemann sums: R_n(f) <= R_n(g) since a <= b and f <= g. *)
+  assert (Hn_pos : (0 < n)%nat) by (unfold n; lia).
+  assert (HnR : 0 < INR n) by (apply lt_0_INR; exact Hn_pos).
+  assert (Hcoef : 0 <= (b - a) / INR n).
+  { apply Rmult_le_pos; [lra | apply Rlt_le, Rinv_0_lt_compat; exact HnR]. }
+  assert (Hsum_le : riemann_sum_uniform f a b n <= riemann_sum_uniform g a b n).
+  { unfold riemann_sum_uniform.
+    apply Rmult_le_compat_l; [exact Hcoef |].
+    apply sum_midpoints_le. exact Hfg. }
+  (* From the eps-bounds: lf < R_n(f) + eps, R_n(g) < lg + eps. *)
+  apply Rabs_def2 in Hbf.
+  apply Rabs_def2 in Hbg.
+  unfold eps in *. lra.
+Qed.
+
+(* ================================================================== *)
+(* === FTC for the identity (midpoint rule is exact for linear) === *)
+(* ================================================================== *)
+
+(* The midpoint partial sum of the identity. *)
+Lemma sum_midpoints_id :
+  forall (a b : R) (n k : nat), (0 < n)%nat ->
+    sum_midpoints (fun x => x) a b n k
+    = INR k * a + (b - a) / INR n * (INR k * INR k / 2).
+Proof.
+  intros a b n k Hn.
+  assert (HnR : INR n <> 0) by (apply not_0_INR; lia).
+  induction k as [|k IH].
+  - simpl. field. exact HnR.
+  - replace (sum_midpoints (fun x => x) a b n (S k))
+      with (a + (INR k + 1 / 2) * ((b - a) / INR n)
+            + sum_midpoints (fun x => x) a b n k) by reflexivity.
+    rewrite IH. rewrite S_INR. field. exact HnR.
+Qed.
+
+Theorem riemann_sum_uniform_id :
+  forall (a b : R) (n : nat), (0 < n)%nat ->
+    riemann_sum_uniform (fun x => x) a b n = (b - a) * (a + b) / 2.
+Proof.
+  intros a b n Hn.
+  unfold riemann_sum_uniform.
+  rewrite sum_midpoints_id by exact Hn.
+  assert (HnR : INR n <> 0) by (apply not_0_INR; lia).
+  field. exact HnR.
+Qed.
+
+(* The midpoint rule is *exact* for the identity at every n, so the
+   constructive integral is the exact antiderivative difference. *)
+Theorem is_RInt_intuit_id :
+  forall (a b : R),
+    is_RInt_intuit (fun x => x) a b ((b - a) * (a + b) / 2).
+Proof.
+  intros a b eps Heps.
+  exists 1%nat. intros n Hn.
+  rewrite (riemann_sum_uniform_id a b n) by lia.
+  replace ((b - a) * (a + b) / 2 - (b - a) * (a + b) / 2) with 0 by ring.
+  rewrite Rabs_R0. exact Heps.
+Qed.
+
+(* FTC for the identity: F(x) = x^2/2, F(b) - F(a) = (b^2 - a^2)/2
+   = (b-a)(a+b)/2. *)
+Theorem is_RInt_intuit_ftc_id :
+  forall (a b : R),
+    is_RInt_intuit (fun x => x) a b
+                   ((fun x => x * x / 2) b - (fun x => x * x / 2) a).
+Proof.
+  intros a b. cbn beta.
+  replace (b * b / 2 - a * a / 2) with ((b - a) * (a + b) / 2) by field.
+  apply is_RInt_intuit_id.
+Qed.
+
+(* FTC for an affine integrand k*x + c via linearity. *)
+Theorem is_RInt_intuit_affine :
+  forall (k c a b : R),
+    is_RInt_intuit (fun x => k * x + c) a b
+                   (k * ((b - a) * (a + b) / 2) + (b - a) * c).
+Proof.
+  intros k c a b.
+  apply is_RInt_intuit_plus.
+  - apply (is_RInt_intuit_scal (fun x => x) a b ((b - a) * (a + b) / 2) k).
+    apply is_RInt_intuit_id.
+  - apply is_RInt_intuit_const.
+Qed.
+
 (* ================================================================== *)
 (* === Footprint check === *)
 (* ================================================================== *)
@@ -223,6 +377,11 @@ Qed.
    should not list classic for any theorem here. *)
 
 Print Assumptions is_RInt_intuit_const.
+Print Assumptions is_RInt_intuit_id.
+Print Assumptions is_RInt_intuit_plus.
+Print Assumptions is_RInt_intuit_le.
+Print Assumptions is_RInt_intuit_affine.
+Print Assumptions is_RInt_intuit_ftc_id.
 Print Assumptions is_RInt_intuit_ftc_constant.
 Print Assumptions is_RInt_intuit_scal.
 Print Assumptions riemann_sum_uniform_const.

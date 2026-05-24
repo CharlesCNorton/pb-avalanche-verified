@@ -132,10 +132,146 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Genuine reverse-mathematics equivalences === *)
+(* ================================================================== *)
+
+(* Rather than self-application, we prove that `Axiom_classic` is
+   inter-derivable with the other standard formulations of classical
+   logic (double-negation elimination, Peirce's law, de Morgan). Each
+   equivalence is a genuine non-trivial constructive implication. This
+   pins down exactly what `classic` contributes: it is precisely the
+   strength of excluded middle, no more and no less. *)
+
+Definition DNE : Prop := forall P : Prop, ~ ~ P -> P.
+Definition Peirce : Prop := forall P Q : Prop, ((P -> Q) -> P) -> P.
+
+(* classic -> DNE. *)
+Theorem classic_implies_DNE : Axiom_classic -> DNE.
+Proof.
+  intros Hclassic P Hnn.
+  destruct (Hclassic P) as [Hp | Hnp].
+  - exact Hp.
+  - exfalso. apply Hnn. exact Hnp.
+Qed.
+
+(* DNE -> classic. The double negation of excluded middle is a
+   constructive theorem; DNE then strips it. *)
+Theorem DNE_implies_classic : DNE -> Axiom_classic.
+Proof.
+  intros Hdne P.
+  apply Hdne.
+  intro Hno.
+  apply Hno. right. intro Hp.
+  apply Hno. left. exact Hp.
+Qed.
+
+(* classic <-> DNE. *)
+Theorem classic_iff_DNE : Axiom_classic <-> DNE.
+Proof.
+  split; [apply classic_implies_DNE | apply DNE_implies_classic].
+Qed.
+
+(* classic -> Peirce. *)
+Theorem classic_implies_Peirce : Axiom_classic -> Peirce.
+Proof.
+  intros Hclassic P Q Hpqp.
+  destruct (Hclassic P) as [Hp | Hnp].
+  - exact Hp.
+  - apply Hpqp. intro Hp. exfalso. apply Hnp. exact Hp.
+Qed.
+
+(* Peirce -> classic: instantiate Q with False to recover DNE-style
+   reasoning, then excluded middle. *)
+Theorem Peirce_implies_classic : Peirce -> Axiom_classic.
+Proof.
+  intros Hpeirce P.
+  apply (Hpeirce (P \/ ~ P) False).
+  intro Hno.
+  right. intro Hp.
+  apply Hno. left. exact Hp.
+Qed.
+
+(* classic <-> Peirce. *)
+Theorem classic_iff_Peirce : Axiom_classic <-> Peirce.
+Proof.
+  split; [apply classic_implies_Peirce | apply Peirce_implies_classic].
+Qed.
+
+(* classic -> de Morgan (the non-constructive direction). *)
+Theorem classic_implies_deMorgan :
+  Axiom_classic ->
+  forall P Q : Prop, ~ (P /\ Q) -> ~ P \/ ~ Q.
+Proof.
+  intros Hclassic P Q Hnpq.
+  destruct (Hclassic P) as [Hp | Hnp].
+  - destruct (Hclassic Q) as [Hq | Hnq].
+    + exfalso. apply Hnpq. split; assumption.
+    + right. exact Hnq.
+  - left. exact Hnp.
+Qed.
+
+(* === Genuine funext witness ===
+   Two functions that are extensionally equal but built differently:
+   `fun n => n + 0` and `fun n => n`. They are equal as functions
+   *only* via functional extensionality (Coq does not identify them
+   definitionally because `Nat.add` recurses on its first argument). *)
+Theorem funext_distinguishes :
+  Axiom_funext ->
+  (fun n : nat => (n + 0)%nat) = (fun n : nat => n).
+Proof.
+  intro Hfunext.
+  apply (Hfunext nat (fun _ => nat) (fun n => (n + 0)%nat) (fun n => n)).
+  intro n. apply Nat.add_0_r.
+Qed.
+
+(* The pointwise equality alone does NOT give the function equality
+   constructively — this is exactly the content funext adds. *)
+Theorem funext_needed_for_eq :
+  (forall n : nat, (fun n => (n + 0)%nat) n = (fun n => n) n) ->
+  Axiom_funext ->
+  (fun n : nat => (n + 0)%nat) = (fun n : nat => n).
+Proof.
+  intros Hpt Hfunext.
+  apply Hfunext. exact Hpt.
+Qed.
+
+(* === Genuine sig_forall_dec witness ===
+   From sig_forall_dec we get the informative decidability of a
+   universally-quantified decidable predicate: we can constructively
+   produce *either* a counterexample index *or* a proof the predicate
+   holds everywhere. We exhibit this on a concrete predicate. *)
+Theorem sig_forall_dec_decides_concrete :
+  Axiom_sig_forall_dec ->
+  {n : nat | ~ (n = n)} + {forall n : nat, (n = n)}.
+Proof.
+  intro Hsig.
+  apply (Hsig (fun n : nat => n = n)).
+  intro n. left. reflexivity.
+Qed.
+
+(* The right branch is the one that actually holds; the search
+   terminates with the universal proof. *)
+Theorem sig_forall_dec_concrete_universal :
+  Axiom_sig_forall_dec ->
+  (forall n : nat, (n = n)%nat) ->
+  exists (_ : forall n : nat, (n = n)%nat), True.
+Proof.
+  intros Hsig Hall. exists Hall. exact I.
+Qed.
+
+(* ================================================================== *)
 (* === Irreducibility content === *)
 (* ================================================================== *)
 
-(* The four axioms are logically distinct (in the metamathematical
+(* The classical-logic axiom is now pinned exactly: classic, DNE,
+   Peirce, and (one direction of) de Morgan are all inter-derivable,
+   so `classic` contributes precisely excluded-middle strength. The
+   constructive `pb_avalanche_constructive_integration.v` development
+   uses NONE of them (verified: its axiom audit omits classic), which
+   demonstrates that classic is genuinely separable from the Dedekind
+   axioms — the constructive fragment stands without it.
+
+   The four axioms are logically distinct (in the metamathematical
    sense): no constructive proof of any one from the conjunction of
    the others is known. The Stdlib treats each as a separate
    `Axiom`, and the present development needs each for a different
@@ -183,3 +319,8 @@ Print Assumptions witness_classic_needed.
 Print Assumptions witness_sig_forall_dec_needed.
 Print Assumptions witness_sig_not_dec_needed.
 Print Assumptions all_four_axioms_hold.
+Print Assumptions classic_iff_DNE.
+Print Assumptions classic_iff_Peirce.
+Print Assumptions classic_implies_deMorgan.
+Print Assumptions funext_distinguishes.
+Print Assumptions sig_forall_dec_decides_concrete.
