@@ -369,8 +369,41 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Uniqueness of the constructive integral === *)
+(* ================================================================== *)
+
+(* The constructive integral value is unique. Pure Stdlib proof, so it
+   keeps this file free of Classical_Prop.classic. *)
+Theorem is_RInt_intuit_unique :
+  forall (f : R -> R) (a b l1 l2 : R),
+    is_RInt_intuit f a b l1 -> is_RInt_intuit f a b l2 -> l1 = l2.
+Proof.
+  intros f a b l1 l2 H1 H2.
+  destruct (Req_dec l1 l2) as [Heq | Hne]; [exact Heq | exfalso].
+  set (eps := Rabs (l1 - l2) / 2).
+  assert (Heps : 0 < eps).
+  { unfold eps. apply Rdiv_lt_0_compat; [apply Rabs_pos_lt; lra | lra]. }
+  destruct (H1 eps Heps) as [N1 HN1].
+  destruct (H2 eps Heps) as [N2 HN2].
+  set (n := Nat.max N1 N2).
+  pose proof (HN1 n (Nat.le_max_l _ _)) as Hb1.
+  pose proof (HN2 n (Nat.le_max_r _ _)) as Hb2.
+  assert (Htri : Rabs (l1 - l2)
+    <= Rabs (l1 - riemann_sum_uniform f a b n)
+       + Rabs (riemann_sum_uniform f a b n - l2)).
+  { replace (l1 - l2)
+      with ((l1 - riemann_sum_uniform f a b n)
+            + (riemann_sum_uniform f a b n - l2)) by ring.
+    apply Rabs_triang. }
+  rewrite (Rabs_minus_sym l1 (riemann_sum_uniform f a b n)) in Htri.
+  unfold eps in *. lra.
+Qed.
+
+(* ================================================================== *)
 (* === Footprint check === *)
 (* ================================================================== *)
+
+Print Assumptions is_RInt_intuit_unique.
 
 (* Goal: the constructive integration predicate does not depend on
    Classical_Prop.classic. The axiom audit at the bottom of this file
