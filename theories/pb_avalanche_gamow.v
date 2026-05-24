@@ -376,6 +376,68 @@ Proof.
     [ lra | repeat apply Rmult_lt_0_compat; try assumption; lra ].
 Qed.
 
+(* E_peak^2 sqrt E_peak = E_peak^{5/2} = (b_G T / 2)^{5/3}. *)
+Lemma gamow_peak_E52 : forall T, 0 < T ->
+  gamow_peak T * gamow_peak T * sqrt (gamow_peak T) = Rpower (b_G * T / 2) (5 / 3).
+Proof.
+  intros T HT. pose proof b_G_pos as Hb. assert (Ha : 0 < b_G * T / 2) by nra.
+  unfold gamow_peak.
+  rewrite <- (Rpower_sqrt (Rpower (b_G*T/2) (2/3))) by (apply Rpower_pos; lra).
+  rewrite Rpower_mult, <- !Rpower_plus. f_equal. lra.
+Qed.
+
+(* Closed form of the peak curvature phi''(E_peak) = 3 b_G / (4 E_peak^{5/2}),
+   exhibiting its T^{-5/3} scaling. *)
+Lemma gamow_peak_curvature_value : forall T, 0 < T ->
+  3 * b_G / (4 * gamow_peak T * gamow_peak T * sqrt (gamow_peak T))
+  = 3 * b_G / 4 * Rpower (b_G * T / 2) (- (5 / 3)).
+Proof.
+  intros T HT. pose proof b_G_pos as Hb. assert (Ha : 0 < b_G * T / 2) by nra.
+  assert (HE : 0 < Rpower (b_G*T/2) (5/3)) by (apply Rpower_pos; lra).
+  rewrite Rpower_Ropp.
+  replace (4 * gamow_peak T * gamow_peak T * sqrt (gamow_peak T))
+    with (4 * (gamow_peak T * gamow_peak T * sqrt (gamow_peak T))) by ring.
+  rewrite (gamow_peak_E52 T HT). field. apply Rgt_not_eq; exact HE.
+Qed.
+
+(* The Gaussian width of the Gamow peak, sqrt(2 / phi''(E_peak)). *)
+Definition gamow_gaussian_width (T : R) : R :=
+  sqrt (2 / (3 * b_G / (4 * gamow_peak T * gamow_peak T * sqrt (gamow_peak T)))).
+
+(* The width scales as T^{5/6}. *)
+Lemma gamow_width_scaling : forall T, 0 < T ->
+  gamow_gaussian_width T
+  = sqrt (8 / (3 * b_G)) * Rpower (b_G / 2) (5 / 6) * Rpower T (5 / 6).
+Proof.
+  intros T HT. pose proof b_G_pos as Hb. assert (Ha : 0 < b_G * T / 2) by nra.
+  assert (HE : 0 < Rpower (b_G*T/2) (5/3)) by (apply Rpower_pos; lra).
+  unfold gamow_gaussian_width. rewrite gamow_peak_curvature_value by exact HT.
+  rewrite Rpower_Ropp.
+  replace (2 / (3 * b_G / 4 * / Rpower (b_G*T/2) (5/3)))
+    with (8 / (3 * b_G) * Rpower (b_G*T/2) (5/3))
+    by (field; split; [ apply Rgt_not_eq; exact HE | apply Rgt_not_eq; lra ]).
+  rewrite sqrt_mult by (try lra; left; apply Rdiv_lt_0_compat; lra).
+  rewrite <- (Rpower_sqrt (Rpower (b_G*T/2) (5/3))) by exact HE.
+  rewrite Rpower_mult.
+  replace (5/3 * /2) with (5/6) by lra.
+  replace (b_G * T / 2) with (b_G / 2 * T) by field.
+  rewrite <- (Rpower_mult_distr (b_G/2) T) by lra. ring.
+Qed.
+
+(* Hence the Maxwellian prefactor T^{-3/2} times the peak width scales as
+   T^{-2/3}, the Kramers prefactor exponent. *)
+Theorem gamow_prefactor_scaling : forall T, 0 < T ->
+  Rpower T (- (3/2)) * gamow_gaussian_width T
+  = sqrt (8 / (3 * b_G)) * Rpower (b_G / 2) (5 / 6) * Rpower T (- (2 / 3)).
+Proof.
+  intros T HT. rewrite gamow_width_scaling by exact HT.
+  set (K := sqrt (8 / (3 * b_G)) * Rpower (b_G / 2) (5 / 6)).
+  replace (Rpower T (- (3/2)) * (K * Rpower T (5/6)))
+    with (K * (Rpower T (- (3/2)) * Rpower T (5/6))) by ring.
+  rewrite <- Rpower_plus.
+  replace (- (3/2) + 5/6) with (- (2/3)) by lra. reflexivity.
+Qed.
+
 (* ================================================================== *)
 (* === Quantum Coulomb functions and the Sommerfeld parameter === *)
 (* ================================================================== *)
@@ -908,3 +970,6 @@ Print Assumptions gamow_peak_exponent_value.
 Print Assumptions gamow_exponent_critical.
 Print Assumptions gamow_exponent_second_deriv.
 Print Assumptions gamow_exponent_curvature_pos.
+Print Assumptions gamow_peak_curvature_value.
+Print Assumptions gamow_width_scaling.
+Print Assumptions gamow_prefactor_scaling.

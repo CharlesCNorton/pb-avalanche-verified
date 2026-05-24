@@ -24,12 +24,14 @@ integral and peak (`sikora_weller_integral_error_band`,
 `sikora_weller_peak_error_band`). The constructions below carry it
 further. Each names the move that closes it.
 
-- Carry the Gamow saddle to the full Laplace asymptotic: with the exponent
-  value `3 (b_G^2 / 4T)^{1/3}`, the stationary point, and the positive
-  curvature already proved, add the Laplace integral approximation
-  `integral exp(-phi) ~ exp(-phi(E_peak)) sqrt(2 pi / phi''(E_peak))` with a
-  remainder bound, yielding the `T^{-2/3}` prefactor and completing
-  `<sigma v> ~ T^{-2/3} exp(-3 (b_G^2 / 4T)^{1/3})`.
+- Carry the Gamow saddle to the full Laplace asymptotic. The exponent value
+  `3 (b_G^2 / 4T)^{1/3}`, the stationary point, the positive curvature, the
+  closed-form curvature `phi''(E_peak) = 3 b_G/4 (b_G T/2)^{-5/3}`, and the
+  `T^{5/6}` peak width with the resulting `T^{-3/2} * width ~ T^{-2/3}`
+  prefactor scaling (`gamow_prefactor_scaling`) are all proved; the one
+  remaining step is the Laplace integral approximation `integral exp(-phi) ~
+  exp(-phi(E_peak)) sqrt(2 pi / phi''(E_peak))` with a remainder bound, which
+  upgrades the scaling law to the full asymptotic constant.
 - Reprove the monotonicity of `exp` and a derivative-positivity
   (mean-value) principle directly from the power series, so the midpoint
   Riemann sum's convergence to `exp b - exp a` drops `classic`; the
@@ -50,8 +52,14 @@ further. Each names the move that closes it.
 - Extend Fubini to every continuous integrand via uniform continuity and
   separable-span approximation, lifting the additive-closure restriction.
 - Lift the BGK quadratic H-theorem to the full `f ln(f / f_eq)`
-  functional, derived from the binary `(v,u) <-> (v',u')` scattering
-  symmetry.
+  functional. The pointwise core is proved: the Gibbs/Klein inequality
+  `f ln(f/f_eq) >= f - f_eq`, the relative-entropy density nonnegativity
+  `f ln(f/f_eq) - f + f_eq >= 0`, its vanishing exactly at `f = f_eq`, and
+  strict positivity off equilibrium (`gibbs_relative_entropy`,
+  `relative_entropy_density_nonneg`, `relative_entropy_density_pos`), so the
+  Maxwellian is the unique zero of the H-functional. The remaining step
+  integrates this density against the binary `(v,u) <-> (v',u')` collision
+  operator to get `dH/dt <= 0`.
 - Assemble the Bethe-Maximon total cross section and the full
   Maxwellian-averaged radiated power, joining the spectral integral and
   moment scaling already proved.

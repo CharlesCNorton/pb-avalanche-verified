@@ -649,6 +649,96 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Relative entropy: the full f ln(f/f_eq) H-functional core === *)
+(* ================================================================== *)
+
+(* The quadratic H above is the small-deviation limit of the full
+   relative-entropy functional H[f] = integral (f ln(f/f_eq) - f + f_eq).
+   Its pointwise density is nonnegative by the Gibbs/Klein inequality, the
+   exact analogue of the quadratic positivity bgk_H_nonneg. *)
+
+Lemma ln_le_sub1 : forall t, 0 < t -> ln t <= t - 1.
+Proof.
+  intros t Ht. pose proof (exp_ineq1_le (ln t)) as H.
+  rewrite exp_ln in H by exact Ht. lra.
+Qed.
+
+(* Gibbs / Klein inequality: f ln(f/g) >= f - g for positive states. *)
+Lemma gibbs_relative_entropy : forall f g, 0 < f -> 0 < g ->
+  f - g <= f * ln (f / g).
+Proof.
+  intros f g Hf Hg.
+  assert (Hfg : 0 < f / g) by (apply Rdiv_lt_0_compat; assumption).
+  assert (Hgf : 0 < g / f) by (apply Rdiv_lt_0_compat; assumption).
+  assert (Hln : ln (f / g) = - ln (g / f)).
+  { assert (H1 : (f / g) * (g / f) = 1)
+      by (field; split; apply Rgt_not_eq; assumption).
+    pose proof (ln_mult (f / g) (g / f) Hfg Hgf) as Hm.
+    rewrite H1, ln_1 in Hm. lra. }
+  rewrite Hln.
+  pose proof (ln_le_sub1 (g / f) Hgf) as H.
+  apply Rle_trans with (f * (1 - g / f)).
+  - apply Req_le. field. apply Rgt_not_eq; exact Hf.
+  - apply Rmult_le_compat_l; lra.
+Qed.
+
+(* The relative-entropy density f ln(f/f_eq) - f + f_eq is nonnegative, the
+   pointwise H-functional positivity that the full H-theorem integrates. *)
+Theorem relative_entropy_density_nonneg : forall f feq, 0 < f -> 0 < feq ->
+  0 <= f * ln (f / feq) - f + feq.
+Proof.
+  intros f feq Hf Hfeq. pose proof (gibbs_relative_entropy f feq Hf Hfeq). lra.
+Qed.
+
+(* Equality holds exactly at f = f_eq: the relative-entropy density vanishes
+   there, identifying the Maxwellian as the unique zero of the H-functional. *)
+Theorem relative_entropy_density_zero_at_eq : forall f, 0 < f ->
+  f * ln (f / f) - f + f = 0.
+Proof.
+  intros f Hf. rewrite Rdiv_diag by (apply Rgt_not_eq; exact Hf).
+  rewrite ln_1. ring.
+Qed.
+
+Lemma ln_lt_sub1 : forall t, 0 < t -> t <> 1 -> ln t < t - 1.
+Proof.
+  intros t Ht Hne.
+  assert (Hlnt : ln t <> 0).
+  { intro H. apply Hne. rewrite <- (exp_ln t Ht), H, exp_0. reflexivity. }
+  pose proof (exp_ineq1 (ln t) Hlnt) as Hi. rewrite exp_ln in Hi by exact Ht. lra.
+Qed.
+
+Lemma gibbs_strict : forall f g, 0 < f -> 0 < g -> f <> g -> f - g < f * ln (f / g).
+Proof.
+  intros f g Hf Hg Hne.
+  assert (Hfg : 0 < f / g) by (apply Rdiv_lt_0_compat; assumption).
+  assert (Hgf : 0 < g / f) by (apply Rdiv_lt_0_compat; assumption).
+  assert (Hgf1 : g / f <> 1).
+  { intro Hc. apply Hne. apply Rmult_eq_reg_r with (r := / f).
+    - rewrite Rinv_r by (apply Rgt_not_eq; exact Hf).
+      unfold Rdiv in Hc. symmetry; exact Hc.
+    - apply Rinv_neq_0_compat, Rgt_not_eq, Hf. }
+  assert (Hln : ln (f / g) = - ln (g / f)).
+  { assert (H1 : (f / g) * (g / f) = 1)
+      by (field; split; apply Rgt_not_eq; assumption).
+    pose proof (ln_mult (f / g) (g / f) Hfg Hgf) as Hm.
+    rewrite H1, ln_1 in Hm. lra. }
+  rewrite Hln.
+  pose proof (ln_lt_sub1 (g / f) Hgf Hgf1) as H.
+  apply Rle_lt_trans with (f * (1 - g / f)).
+  - apply Req_le. field. apply Rgt_not_eq; exact Hf.
+  - apply Rmult_lt_compat_l; lra.
+Qed.
+
+(* Strict positivity off equilibrium: the relative-entropy density vanishes
+   exactly at f = f_eq and is strictly positive otherwise, so the Maxwellian
+   is the unique zero of the H-functional. *)
+Theorem relative_entropy_density_pos : forall f feq, 0 < f -> 0 < feq ->
+  f <> feq -> 0 < f * ln (f / feq) - f + feq.
+Proof.
+  intros f feq Hf Hfeq Hne. pose proof (gibbs_strict f feq Hf Hfeq Hne). lra.
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
@@ -671,6 +761,9 @@ Print Assumptions f_slowing_pos.
 Print Assumptions f_slowing_decreasing.
 Print Assumptions energy_moment_slowing.
 Print Assumptions energy_decay_slow_down.
+Print Assumptions gibbs_relative_entropy.
+Print Assumptions relative_entropy_density_nonneg.
+Print Assumptions relative_entropy_density_pos.
 Print Assumptions bgk_H_closed_form.
 Print Assumptions bgk_H_nonneg.
 Print Assumptions bgk_H_decreasing.
