@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*                                                                            *)
-(*     Physical constants and the Spitzer prefactor signature (item 17)       *)
+(*     Physical constants and the Spitzer prefactor signature                 *)
 (*                                                                            *)
 (*     Builds m_e, m_alpha, Z_e, e_charge, eps_0, k_B, hbar as DR-typed       *)
 (*     constants in their proper unit signatures, and exhibits the            *)

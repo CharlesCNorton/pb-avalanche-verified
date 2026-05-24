@@ -1,7 +1,7 @@
 (******************************************************************************)
 (*                                                                            *)
 (*     IAEA-evaluated p-11B cross sections: piecewise-linear interpolation,   *)
-(*     trapezoidal integration, and bounded interpolation error (item 3)      *)
+(*     trapezoidal integration, and bounded interpolation error               *)
 (*                                                                            *)
 (*     A discrete table of (E_i, sigma_i) points is interpolated by the       *)
 (*     piecewise-linear function interp_linear, integrated by the             *)
@@ -681,7 +681,7 @@ Proof.
   - apply RInt_interp_linear_eq_trap. exact Hsort.
 Qed.
 
-(* === Zero-boundary continuity (item 3) ===
+(* === Zero-boundary continuity ===
 
    With head_V T = 0 and last_V T = 0, the zero-extended interpolant
    is continuous everywhere on R: continuous on the interior by
@@ -917,7 +917,7 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(* === pad_zeros: produces a zero-boundaried table (item 4) ===
+(* === pad_zeros: produces a zero-boundaried table ===
 
    Given a table T, pad_zeros T prepends and appends a zero-valued
    point at energies bracketing the table's interval. The resulting
@@ -971,7 +971,7 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(* === Sup-norm bound on interp_linear (item 2) ===
+(* === Sup-norm bound on interp_linear ===
 
    On a sorted table T, the piecewise-linear interpolant is bounded
    by the absolute-value maximum of the table's value column. The
@@ -1347,7 +1347,7 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(* === Sikora-Weller p-11B cross-section tabulation (item 14) === *)
+(* === Sikora-Weller p-11B cross-section tabulation === *)
 (* ================================================================== *)
 
 (* A 20-point evaluation of the p-11B(alpha_0 + alpha_1 + alpha_2)
@@ -1452,7 +1452,7 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(* === Symmetric two-sided interpolation bounds (item 11) === *)
+(* === Symmetric two-sided interpolation bounds === *)
 (* ================================================================== *)
 
 (* The two-sided form of the sup bound: every interpolated value lies

@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*                                                                            *)
-(*     Synchrotron toroidal geometry (item 27)                                *)
+(*     Synchrotron toroidal geometry                                          *)
 (*                                                                            *)
 (*     A relativistic charged particle in a magnetic field B emits            *)
 (*     synchrotron radiation. The Larmor / relativistic Larmor formula        *)

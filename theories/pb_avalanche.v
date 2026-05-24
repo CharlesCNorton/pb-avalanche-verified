@@ -1229,7 +1229,7 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(* === Asymptotic completeness of the FoM upper bound (item 13) === *)
+(* === Asymptotic completeness of the FoM upper bound === *)
 (* ================================================================== *)
 
 (* Reaching the maximum-achievable multiplication factor in the
@@ -1329,7 +1329,6 @@ Qed.
 
 (* ================================================================== *)
 (* === Numerical safety-margin theorems at every named witness === *)
-(* === (item 5 of the third-generation deepening program) === *)
 (* ================================================================== *)
 
 (* For each named witness state, compute 1 - multiplication_factor as

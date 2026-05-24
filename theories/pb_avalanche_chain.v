@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*                                                                            *)
-(*     Time-integrated geometric chain (item 24)                              *)
+(*     Time-integrated geometric chain                                        *)
 (*                                                                            *)
 (*     The all-generations multiplication M_total := sum_{n=0}^{infty} M^n.   *)
 (*     For |M| < 1, this geometric series converges to 1 / (1 - M), giving   *)
@@ -117,7 +117,7 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(* === Item 21: per-generation chain rates === *)
+(* === Per-generation chain rates === *)
 (* ================================================================== *)
 
 (* The rate at generation n is M^n * R_primary. Concretely:

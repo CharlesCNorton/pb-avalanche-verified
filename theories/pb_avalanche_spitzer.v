@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*                                                                            *)
-(*     Spitzer-Trubnikov slowing-down time and Coulomb logarithm (item 5)     *)
+(*     Spitzer-Trubnikov slowing-down time and Coulomb logarithm              *)
 (*                                                                            *)
 (*     Derives the scaling tau ~ T^(3/2) / n from the Coulomb-collision       *)
 (*     energy-loss equation, carrying the Coulomb logarithm ln Lambda as      *)
@@ -384,7 +384,7 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(* === Derived Coulomb-log envelope (item 18) === *)
+(* === Derived Coulomb-log envelope === *)
 (* ================================================================== *)
 
 (* The Coulomb logarithm ln Lambda arises from cutting off the

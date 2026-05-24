@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*                                                                            *)
-(*     Coulomb logarithm numerical evaluation (item 15)                       *)
+(*     Coulomb logarithm numerical evaluation                                 *)
 (*                                                                            *)
 (*     The Coulomb logarithm controls how often Coulomb collisions thermalise *)
 (*     ions in a plasma. The standard NRL Plasma Formulary expression for     *)

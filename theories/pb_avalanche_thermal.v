@@ -1,7 +1,7 @@
 (******************************************************************************)
 (*                                                                            *)
 (*     Maxwellian-averaged reactivity and the temperature dependence          *)
-(*     of the primary rate (item 4)                                           *)
+(*     of the primary rate                                                    *)
 (*                                                                            *)
 (*     The primary p+11B rate coefficient sigma_v_pB_thermal(T) is the        *)
 (*     Maxwell-Boltzmann thermal average of sigma(E) v(E):                     *)
@@ -14,8 +14,8 @@
 (*           integral_0^b exp(-E/T) dE = T (1 - exp(-b/T))                     *)
 (*         via the fundamental theorem of calculus with antiderivative        *)
 (*         F(E) = -T exp(-E/T);                                               *)
-(*       - defines the Maxwellian average and proves it is a genuine          *)
-(*         weighted average bounded by the pointwise maximum of sigma*v;       *)
+(*       - defines the Maxwellian average and proves it is a weighted         *)
+(*         average bounded by the pointwise maximum of sigma*v;                *)
 (*       - establishes the primary rate R_primary(T) = n_p n_B <sigma v>(T)   *)
 (*         and its monotone response to the reactivity.                       *)
 (*                                                                            *)
@@ -154,7 +154,7 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(* === Improper integral over [0, +infty) (item 11) === *)
+(* === Improper integral over [0, +infty) === *)
 (* ================================================================== *)
 
 (* The Boltzmann weight integrated over the half-line [0, +infty)

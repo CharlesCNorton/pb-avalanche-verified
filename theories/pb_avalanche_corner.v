@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*                                                                            *)
-(*     Corner-state achievability for the avalanche figure of merit (item 10) *)
+(*     Corner-state achievability for the avalanche figure of merit           *)
 (*                                                                            *)
 (*     The framework already proves the upper bound                           *)
 (*       avalanche_figure_of_merit s <= FoM_max_reactor                       *)

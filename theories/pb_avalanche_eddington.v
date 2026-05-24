@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*                                                                            *)
-(*     Eddington stellar instantiation (item 29)                              *)
+(*     Eddington stellar instantiation                                        *)
 (*                                                                            *)
 (*     Instantiates the abstract framework against solar-core p-p parameters  *)
 (*     and proves that the Sun is intrinsically non-avalanching. This         *)

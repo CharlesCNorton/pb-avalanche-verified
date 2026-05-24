@@ -504,7 +504,7 @@ Module KineticFramework (K : KINETIC_MODEL_PARAMS).
   Qed.
 
   (* ================================================================ *)
-  (* === Substantive factorization (item 1) === *)
+  (* === Substantive factorization === *)
   (* ================================================================ *)
 
   (* The logarithmic kinematic factor of the slowing-down spectrum:
@@ -600,7 +600,7 @@ Module KineticFramework (K : KINETIC_MODEL_PARAMS).
   Qed.
 
   (* ================================================================ *)
-  (* === Energy-resolved subcriticality bound (item 2) === *)
+  (* === Energy-resolved subcriticality bound === *)
   (* ================================================================ *)
 
   (* The figure of merit is bounded by the product of the kinematic
@@ -629,7 +629,7 @@ Module KineticFramework (K : KINETIC_MODEL_PARAMS).
     - apply Req_le. ring.
   Qed.
 
-  (* Matching lower bound on the figure of merit (item 13). *)
+  (* Matching lower bound on the figure of merit. *)
   Theorem kinetic_FoM_lower_bound :
     forall R_prim n_B tau,
       0 < R_prim -> 0 < n_B -> 0 < tau ->
@@ -693,7 +693,7 @@ Module KineticFramework (K : KINETIC_MODEL_PARAMS).
   Qed.
 
   (* ================================================================ *)
-  (* === Competing loss channels (item 12) === *)
+  (* === Competing loss channels === *)
   (* ================================================================ *)
 
   (* An alpha in the plasma is lost through two competing channels:
@@ -798,7 +798,7 @@ Module KineticFramework (K : KINETIC_MODEL_PARAMS).
   Proof. intros S tau. unfold R_secondary_kinetic. ring. Qed.
 
   (* ================================================================ *)
-  (* === Magnetic field coupling (item 14) === *)
+  (* === Magnetic field coupling === *)
   (* ================================================================ *)
 
   (* The alpha Larmor radius rho = m v / (q B) sets the cross-field
@@ -1021,7 +1021,7 @@ Module KineticFramework (K : KINETIC_MODEL_PARAMS).
   Qed.
 
   (* ================================================================ *)
-  (* === Energy-dependent Coulomb slowing-down time (item 12) === *)
+  (* === Energy-dependent Coulomb slowing-down time === *)
   (* ================================================================ *)
 
   (* The constant-tau model Edot(E) := -E / tau is a simplification. The

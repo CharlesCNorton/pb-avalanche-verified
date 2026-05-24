@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*                                                                            *)
-(*     Energy-resolved velocity kinetic model (item 12)                       *)
+(*     Energy-resolved velocity kinetic model                                 *)
 (*                                                                            *)
 (*     Instantiates KINETIC_MODEL_PARAMS with a non-constant velocity         *)
 (*     v_alpha(E) = sqrt(E)  (in MeV^{1/2} units, classical kinematics        *)
@@ -191,7 +191,7 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(* === Item 13: numerical FoM_max at SW+energy-resolved kinetic === *)
+(* === Numerical FoM_max at SW+energy-resolved kinetic === *)
 (* ================================================================== *)
 
 (* The sigma_max * v_max product at the energy-resolved instance is
@@ -210,7 +210,7 @@ Qed.
    parametrised by R_primary, n_B, S = sigma_v_pB_thermal, tau =
    tau_slow_alpha, is bounded by
      n_alpha * n_B * (1/5000000) / R_prim.
-   This is the numerical content of item 13. *)
+   This is the numerical content. *)
 Theorem energy_resolved_kinetic_FoM_numerical :
   forall R_prim n_B S tau,
     0 < R_prim -> 0 < n_B -> 0 < S -> 0 < tau ->

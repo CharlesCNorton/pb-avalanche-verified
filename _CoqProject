@@ -31,14 +31,4 @@ theories/pb_avalanche_coulomb_log.v
 theories/pb_avalanche_maxwellian_sw.v
 theories/pb_avalanche_synchrotron.v
 theories/pb_avalanche_hora_rebuttal.v
-theories/pb_avalanche_fubini_3d.v
-theories/pb_avalanche_picard.v
-theories/pb_avalanche_bethe_heitler.v
-theories/pb_avalanche_euler_maclaurin.v
-theories/pb_avalanche_coulomb_waves.v
-theories/pb_avalanche_boltzmann.v
-theories/pb_avalanche_distributional_fp.v
-theories/pb_avalanche_constructive_integration.v
-theories/pb_avalanche_axiom_irreducibility.v
-theories/pb_avalanche_curvature_tight.v
 theories/pb_avalanche_audit.v

@@ -2,7 +2,7 @@
 (*                                                                            *)
 (*     Admissible parameter envelope and the Hora regime                      *)
 (*                                                                            *)
-(*     Item 7: universal subcriticality across the physically realizable      *)
+(*     First, universal subcriticality across the physically realizable       *)
 (*     parameter region. A physical-scale kinetic instance (E_min = E_birth/2 *)
 (*     so the kinematic factor L = ln 2 < 1; knock-on cross-section bound      *)
 (*     sigma_max = 10^-25 cm^2 from the IAEA scale; alpha velocity bound       *)
@@ -11,7 +11,7 @@
 (*     slowing-down time at most 1 s. The multiplication factor is proved      *)
 (*     strictly below 1 across the whole region.                              *)
 (*                                                                            *)
-(*     Item 8: the Hora regime. Hora's avalanche scenario assumes a large      *)
+(*     Second, the Hora regime. Hora's avalanche scenario assumes a large      *)
 (*     slowing-down/confinement time and a large velocity integral. We         *)
 (*     instantiate at Hora's most generous residence time (tau = 1 s, two      *)
 (*     orders of magnitude above the realistic ~10^-2 s) and the full          *)
@@ -144,7 +144,7 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(* === Admissible parameter envelope (item 7) === *)
+(* === Admissible parameter envelope === *)
 (* ================================================================== *)
 
 (* The physically realizable region: positive plasma parameters with
@@ -196,7 +196,7 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(* === The Hora regime (item 8) === *)
+(* === The Hora regime === *)
 (* ================================================================== *)
 
 (* Hora's avalanche scenario posits a large slowing-down/confinement
@@ -230,7 +230,7 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(* === Magnetic-field-threaded ITER witness (item 8) === *)
+(* === Magnetic-field-threaded ITER witness === *)
 (* ================================================================== *)
 
 (* Until now, the witness states in pb_avalanche.v have B_T set to a
@@ -313,8 +313,8 @@ Proof.
   - exact HB12.
 Qed.
 
-(* The ITER-witness safety margin (item 5 of the third-generation
-   program). The exact closed-form value of M at the ITER witness
+(* The ITER-witness safety margin. The exact closed-form value of M at
+   the ITER witness
    involves the energy-resolved sigma_v_kinetic integral, but for
    PhysicalKineticParams with constant sigma and v, sigma_v_kinetic
    evaluates to sigma_E_max * v_E_max = 10^-16, giving the explicit
@@ -330,7 +330,7 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(* === Maxwellian-thermal connection (item 22) === *)
+(* === Maxwellian-thermal connection === *)
 (* ================================================================== *)
 
 (* Thermal primary rate: R_primary = n_p * n_B * <sigma v>_T. This

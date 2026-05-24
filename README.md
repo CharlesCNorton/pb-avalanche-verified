@@ -10,9 +10,9 @@ strictly below unity throughout the reactor regime.
 
 The development has grown well beyond the original settlement into a
 broad library of verified plasma-physics and numerical-analysis
-results. It is **43 files** under `theories/`, all compiling clean on
-Rocq 9.0 with Coquelicot 3.4.4, with a four-axiom footprint guarded at
-build time (see *Axiom footprint* below).
+results under `theories/`, compiling clean on Rocq 9.0 with Coquelicot
+3.4.4, with its axiom footprint guarded at build time (see *Axiom
+footprint* below).
 
 ## The core settlement
 
@@ -72,29 +72,28 @@ with complete `Qed` proofs (no `Admitted`, no project-local axioms):
   sup-norm and two-sided bounds, C^0 continuity of the zero-extended
   interpolant, trapezoidal integration error, and the Sikora-Weller
   p-11B cross-section table.
-- **Tight interpolation-error constant** (`pb_avalanche_curvature_tight.v`):
-  the sharp `M_2 (b-a)^2 / 8` bound, derived via the Cauchy
+- **Cubic Hermite splines and tight interpolation error**
+  (`pb_avalanche_spline.v`): endpoint interpolation, the linear-reduction
+  identity, and the sharp `M_2 (b-a)^2 / 8` bound, derived via the Cauchy
   divided-difference mean value theorem — Rolle's theorem applied three
   times, bridged from Coquelicot `is_derive` to the Stdlib `Rolle`
   (interior-point) theorem through `is_derive_Reals`.
-- **Romberg / Euler-Maclaurin** (`pb_avalanche_romberg.v`,
-  `pb_avalanche_euler_maclaurin.v`): the composite trapezoidal rule for
+- **Romberg / Euler-Maclaurin** (`pb_avalanche_romberg.v`): the
+  composite trapezoidal rule for
   `x^2` computed in closed form via the sum-of-squares formula, shown to
   equal the exact integral plus exactly `(b-a)^3 / (6 n^2)`, with
   level-1 Richardson extrapolation proved exact; Bernoulli-number
   recurrence checks and the general level-k Richardson cancellation.
-- **Cubic Hermite splines** (`pb_avalanche_spline.v`): endpoint
-  interpolation and the linear-reduction identity.
-- **Constructive integration** (`pb_avalanche_constructive_integration.v`):
+- **Constructive integration** (`pb_avalanche_constructive.v`):
   a `Classical_Prop.classic`-free midpoint Riemann integral with FTC for
   constants and the identity, additivity, scalar homogeneity, and
   monotonicity (the `RInt_le` analogue) — all on the Dedekind axioms
   alone.
-- **3D Fubini** (`pb_avalanche_fubini_3d.v`): nested `RInt` commutativity
+- **3D Fubini** (`pb_avalanche_spatial.v`): nested `RInt` commutativity
   for the separable span, hence for the whole polynomial algebra via
   additivity, plus box volumetric averaging.
-- **Gamow tunneling and Coulomb waves** (`pb_avalanche_gamow.v`,
-  `pb_avalanche_coulomb_waves.v`): the Gamow-peak stationary point, the
+- **Gamow tunneling and Coulomb waves** (`pb_avalanche_gamow.v`): the
+  Gamow-peak stationary point, the
   Sommerfeld parameter, and the s-wave Coulomb coefficients proved to
   satisfy the Coulomb wave equation term-by-term, matching the
   semiclassical Gamow factor in the high-barrier limit.
@@ -104,16 +103,16 @@ with complete `Qed` proofs (no `Admitted`, no project-local axioms):
   NRL Coulomb-log evaluated to 23.5 at canonical reactor parameters.
 - **Maxwellian reactivity** (`pb_avalanche_maxwellian_sw.v`): a
   positive thermal reactivity over the Sikora-Weller table.
-- **Time evolution via Picard** (`pb_avalanche_picard.v`): the affine
+- **Time evolution via Picard** (`pb_avalanche_ash.v`): the affine
   ash-production ODE solved in closed form, and a general Picard
   fixed-point operator proved to generate the closed-form iterates.
-- **Kinetic theory** (`pb_avalanche_boltzmann.v`,
-  `pb_avalanche_distributional_fp.v`): the BGK relaxation collision
+- **Kinetic theory** (`pb_avalanche_sw_kinetic.v`,
+  `pb_avalanche_fokker_planck.v`): the BGK relaxation collision
   operator with mass conservation, exact relaxation dynamics and
   monotone H-decay; and the weak-derivative integration-by-parts
   identity (`<phi', psi> = -<phi, psi'>` for compactly supported test
   functions) underlying the distributional Fokker-Planck formulation.
-- **Radiation** (`pb_avalanche_bethe_heitler.v`,
+- **Radiation** (`pb_avalanche_energy_balance.v`,
   `pb_avalanche_synchrotron.v`): the relativistic bremsstrahlung
   correction derived from the Lorentz factor `beta^2 = 1 - 1/gamma^2`
   (with the non-relativistic limit recovered as a derivative match at
@@ -129,7 +128,7 @@ with complete `Qed` proofs (no `Admitted`, no project-local axioms):
 - **Hora-paper rebuttal** (`pb_avalanche_hora_rebuttal.v`): the claimed
   avalanche-enhancement factor is shown to remain subcritical for any
   enhancement below the explicit kinematic threshold.
-- **Axiom irreducibility** (`pb_avalanche_axiom_irreducibility.v`): the
+- **Axiom irreducibility** (`pb_avalanche_audit.v`): the
   reverse-mathematics equivalences `classic <-> DNE <-> Peirce`, the de
   Morgan implication, and concrete witnesses that functional
   extensionality and the Dedekind decidability axioms each do real work.
@@ -137,15 +136,15 @@ with complete `Qed` proofs (no `Admitted`, no project-local axioms):
 ## Axiom footprint
 
 Every theorem closes by `Qed`. There are no `Admitted`/`admit` proofs
-and no project-local axioms anywhere. The combined footprint over all
-43 files is exactly four axioms:
+and no project-local axioms anywhere. The combined axiom footprint is:
 
     ClassicalDedekindReals.sig_forall_dec
     ClassicalDedekindReals.sig_not_dec
     FunctionalExtensionality.functional_extensionality_dep
     Classical_Prop.classic
 
-The first three are the Stdlib Dedekind-real axioms; `Classical_Prop.classic`
+`sig_forall_dec`, `sig_not_dec`, and `functional_extensionality_dep` are
+the Stdlib Dedekind-real axioms; `Classical_Prop.classic`
 (excluded middle) is pulled in only by Coquelicot's
 fundamental-theorem-of-calculus machinery. The constructive-integration
 file demonstrates that the FTC layer can be re-derived without it: its
@@ -160,7 +159,7 @@ ever diverges from `scripts/expected_axioms.txt`.
 
 ```
 make              # generates Makefile.coq via `rocq makefile`, compiles theories/
-make audit-check  # rebuilds the audit and enforces the four-axiom manifest
+make audit-check  # rebuilds the audit and enforces the axiom manifest
 ```
 
 ## Dependencies

@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*                                                                            *)
-(*     Dimensional re-derivation of the avalanche framework (item 16)         *)
+(*     Dimensional re-derivation of the avalanche framework                   *)
 (*                                                                            *)
 (*     Reformulates the abstract PB_AVALANCHE_PARAMS interface using          *)
 (*     DR-typed parameters from pb_avalanche_units.v. Every quantity          *)
@@ -185,7 +185,7 @@ Lemma rate_two_density_ratio_dimensionless :
 Proof. apply unit_mul_inv_r. Qed.
 
 (* ================================================================== *)
-(* === Item 19: DR-typed PB_AVALANCHE_PARAMS module type === *)
+(* === DR-typed PB_AVALANCHE_PARAMS module type === *)
 (* ================================================================== *)
 
 (* A DR-typed reformulation of the avalanche-framework hypotheses.

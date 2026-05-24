@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*                                                                            *)
-(*     Spitzer prefactor numerical match from physical constants (item 14)    *)
+(*     Spitzer prefactor numerical match from physical constants              *)
 (*                                                                            *)
 (*     The Spitzer-Trubnikov ion slowing-down time is                         *)
 (*                                                                            *)

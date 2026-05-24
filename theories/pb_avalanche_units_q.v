@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*                                                                            *)
-(*     Rational-exponent dimensional types (item 15)                          *)
+(*     Rational-exponent dimensional types                                    *)
 (*                                                                            *)
 (*     Generalizes the Z-exponent Unit type of pb_avalanche_units.v to        *)
 (*     Q-exponents (rationals over Q). Required to capture quantities like    *)
@@ -234,7 +234,7 @@ Proof.
   repeat split; rewrite inject_Z_plus; reflexivity.
 Qed.
 
-(* === Item 18: full Q-exponent powers and roots === *)
+(* === Full Q-exponent powers and roots === *)
 
 (* Multiplication of exponents: (u^m)^n = u^(m*n). *)
 Lemma unit_pow_q_mul :

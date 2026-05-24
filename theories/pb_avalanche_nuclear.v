@@ -1,7 +1,6 @@
 (******************************************************************************)
 (*                                                                            *)
 (*     NUCLEAR_AVALANCHE_PARAMS generalization to arbitrary reactant pairs    *)
-(*     (item 28)                                                              *)
 (*                                                                            *)
 (*     Generalizes the framework over the reactant pair (Z1, A1, Z2, A2, Q)   *)
 (*     and instantiates for p-11B, D-3He, D-D. Each reaction has its own      *)
@@ -190,7 +189,7 @@ Proof.
 Qed.
 
 (* ================================================================== *)
-(* === Item 20: NUCLEAR_AVALANCHE_PARAMS — fully parametrised === *)
+(* === NUCLEAR_AVALANCHE_PARAMS — fully parametrised === *)
 (* ================================================================== *)
 
 (* A nuclear-avalanche framework combines a NUCLEAR_REACTANTS module
@@ -335,7 +334,7 @@ Module DHe3_Avalanche := NuclearAvalancheFramework DHe3_Avalanche_Params.
 
 (* All three reactant pairs satisfy the avalanche subcriticality
    bound under realistic envelope parameters; this is the
-   "fully parametrised" content of item 20. *)
+   fully parametrised content. *)
 Theorem all_pairs_subcritical :
   pB_Avalanche.FoM_max < 1 /\
   DHe3_Avalanche.FoM_max < 1.

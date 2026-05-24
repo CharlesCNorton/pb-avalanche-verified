@@ -1,7 +1,7 @@
 (******************************************************************************)
 (*                                                                            *)
 (*     Maxwellian thermal reactivity numerically realised for                 *)
-(*     Sikora-Weller cross section (item 16)                                  *)
+(*     Sikora-Weller cross section                                            *)
 (*                                                                            *)
 (*     The Maxwellian-averaged reactivity                                     *)
 (*       <sigma v>_T = (8 / (pi * mu))^{1/2} * (1/T^{3/2}) *                  *)

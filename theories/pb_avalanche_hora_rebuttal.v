@@ -1,7 +1,6 @@
 (******************************************************************************)
 (*                                                                            *)
 (*     Hora-Putvinski paper-specific avalanche-enhancement refutation         *)
-(*     (item 28)                                                              *)
 (*                                                                            *)
 (*     The Hora-Putvinski 2017 papers propose a "photo-stimulated"            *)
 (*     enhancement of the p-11B secondary-fusion chain by some factor         *)

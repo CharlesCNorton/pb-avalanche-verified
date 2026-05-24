@@ -1,6 +1,6 @@
 (******************************************************************************)
 (*                                                                            *)
-(*     Dimensional types with unit-balance enforcement (item 6)               *)
+(*     Dimensional types with unit-balance enforcement                        *)
 (*                                                                            *)
 (*     A unit is a 6-tuple of signed integer exponents over the SI base       *)
 (*     dimensions:                                                            *)

@@ -1,34 +1,32 @@
 (******************************************************************************)
 (*                                                                            *)
-(*     Final aggregate theorem (item 15)                                      *)
+(*     Final aggregate theorem                                                *)
 (*                                                                            *)
-(*     Composes the verified content of all earlier items into a single       *)
+(*     Composes the verified content of all earlier results into a single     *)
 (*     closing statement of the Hora-Putvinski settlement.                    *)
 (*                                                                            *)
 (*     The theorem [pb_avalanche_settlement] aggregates:                      *)
 (*                                                                            *)
-(*       (A) the bilinear kinetic factorization of the secondary rate         *)
-(*           (items 1, 11) — proved as                                        *)
-(*             PK.R_secondary_bilinear_factorization;                         *)
-(*       (B) the sufficient condition for no avalanche                        *)
-(*           (item 2) — proved as PK.kinetic_no_avalanche;                    *)
-(*       (C) the matching two-sided sandwich on the figure of merit           *)
-(*           (item 13) — proved as PK.kinetic_FoM_sandwich;                   *)
-(*       (D) the universal envelope statement                                 *)
-(*           (item 7) — proved as envelope_subcritical;                       *)
-(*       (E) the Hora regime statement                                        *)
-(*           (item 8) — proved as hora_regime_no_avalanche;                   *)
-(*       (F) the steady-state slowing-down flux identity                      *)
-(*           (item 10) — proved as PK.slowing_flux_constant;                  *)
-(*       (G) the Maxwellian thermal-average bound                             *)
-(*           (item 4) — proved as reactivity_bound;                           *)
-(*       (H) the Spitzer-Trubnikov scaling (item 5) — proved as               *)
+(*       (A) the bilinear kinetic factorization of the secondary rate,        *)
+(*           proved as PK.R_secondary_bilinear_factorization;                 *)
+(*       (B) the sufficient condition for no avalanche,                       *)
+(*           proved as PK.kinetic_no_avalanche;                               *)
+(*       (C) the matching two-sided sandwich on the figure of merit,          *)
+(*           proved as PK.kinetic_FoM_sandwich;                               *)
+(*       (D) the universal envelope statement,                                *)
+(*           proved as envelope_subcritical;                                  *)
+(*       (E) the Hora regime statement,                                       *)
+(*           proved as hora_regime_no_avalanche;                              *)
+(*       (F) the steady-state slowing-down flux identity,                     *)
+(*           proved as PK.slowing_flux_constant;                              *)
+(*       (G) the Maxwellian thermal-average bound,                            *)
+(*           proved as reactivity_bound;                                      *)
+(*       (H) the Spitzer-Trubnikov scaling, proved as                         *)
 (*           tau_spitzer_scaling_T and tau_spitzer_sandwich;                  *)
-(*       (I) the IAEA piecewise-linear interpolation error bound              *)
-(*           (item 3) — proved as interp_error_bound;                         *)
-(*       (J) the dimensional balance of the multiplication factor             *)
-(*           (item 6) — proved as                                             *)
-(*           multiplication_factor_unit_dimensionless.                        *)
+(*       (I) the IAEA piecewise-linear interpolation error bound,             *)
+(*           proved as interp_error_bound;                                    *)
+(*       (J) the dimensional balance of the multiplication factor,            *)
+(*           proved as multiplication_factor_unit_dimensionless.              *)
 (*                                                                            *)
 (*     Author: Charles C. Norton                                              *)
 (*     License: MIT                                                           *)
@@ -73,19 +71,19 @@ Proof.
   apply (PK.kinetic_no_avalanche R_prim n_B tau HR HnB Htau Hsub).
 Qed.
 
-(* Universal admissible-envelope subcriticality (item 7). *)
+(* Universal admissible-envelope subcriticality. *)
 Theorem pb_avalanche_envelope_subcriticality :
   forall R_prim n_B tau, admissible R_prim n_B tau ->
     PK.R_secondary_kinetic n_B (3 * R_prim) tau / R_prim < 1.
 Proof. exact envelope_subcritical. Qed.
 
-(* Putvinski rebuttal under the Hora regime (item 8). *)
+(* Putvinski rebuttal under the Hora regime. *)
 Theorem pb_avalanche_hora_rebuttal :
   forall R_prim, 0 < R_prim ->
     PK.R_secondary_kinetic hora_n_B (3 * R_prim) hora_tau / R_prim < 1.
 Proof. exact hora_regime_no_avalanche. Qed.
 
-(* Steady-state slowing-down flux (item 10): the slowing-down distribution
+(* Steady-state slowing-down flux: the slowing-down distribution
    carries the source rate uniformly across all reactive energies. *)
 Theorem pb_avalanche_slowing_steady_state :
   forall S tau E1 E2, 0 < tau -> E1 <> 0 -> E2 <> 0 ->
@@ -95,7 +93,7 @@ Proof.
   apply PK.slowing_down_steady_state; assumption.
 Qed.
 
-(* Maxwellian thermal-average bound on the reactivity (item 4):
+(* Maxwellian thermal-average bound on the reactivity:
    the temperature-averaged sigma*v product is bounded above by its
    pointwise peak. The closed-form Boltzmann-weight integral
    ∫₀^b exp(-E/T) dE = T (1 - exp(-b/T)) is also established. *)
@@ -104,7 +102,7 @@ Theorem pb_avalanche_thermal_exp_integral :
     RInt (fun E : R => exp (- E / T)) 0 b = T * (1 - exp (- b / T)).
 Proof. exact RInt_exp_thermal. Qed.
 
-(* Spitzer-Trubnikov scaling and bounds (item 5). *)
+(* Spitzer-Trubnikov scaling and bounds. *)
 Theorem pb_avalanche_spitzer_scaling :
   forall T n_e ln_lambda k,
     0 < T -> 0 < n_e -> 0 < ln_lambda -> 0 < k ->
@@ -121,7 +119,7 @@ Theorem pb_avalanche_spitzer_envelope :
       spitzer_C * T * sqrt T / (n_e * ln_Lambda_min).
 Proof. exact tau_spitzer_sandwich. Qed.
 
-(* IAEA-evaluated cross-section bound (item 3). *)
+(* IAEA-evaluated cross-section bound. *)
 Theorem pb_avalanche_IAEA_error_bound :
   forall (sigma_true : R -> R) (T : iaea_table) (eps a b : R),
     a <= b ->
@@ -135,7 +133,7 @@ Theorem pb_avalanche_IAEA_error_bound :
 Proof. exact interp_error_bound. Qed.
 
 (* Dimensional balance: the multiplication factor M = R_secondary / R_primary
-   reduces to the dimensionless zero_unit (item 6). *)
+   reduces to the dimensionless zero_unit. *)
 Theorem pb_avalanche_dimensional_balance :
   unit_div rate_unit rate_unit = zero_unit.
 Proof. exact multiplication_factor_unit_dimensionless. Qed.

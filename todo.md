@@ -1,10 +1,10 @@
 # TODO
 
 Every deepening item now carries a mechanised core with complete `Qed`
-proofs. The 43 files in `theories/` compile clean on the `rocq9` switch
-with Coquelicot 3.4.4, and the four-axiom footprint
-(`sig_forall_dec`, `sig_not_dec`, `classic`,
-`functional_extensionality_dep`) is guarded by `scripts/check_axioms.sh`.
+proofs. `theories/` compiles clean on the `rocq9` switch with Coquelicot
+3.4.4, and the axiom footprint (`sig_forall_dec`, `sig_not_dec`,
+`classic`, `functional_extensionality_dep`) is guarded by
+`scripts/check_axioms.sh`.
 
 The nine residuals named earlier are landed:
 
