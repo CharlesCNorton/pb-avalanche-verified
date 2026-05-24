@@ -110,6 +110,41 @@ Section AshODE.
     - exact Hlim.
   Qed.
 
+  Lemma n_ash_solution_cont : forall s, continuous n_ash_solution s.
+  Proof.
+    intro s.
+    apply (ex_derive_continuous (K := R_AbsRing) (V := R_NormedModule)).
+    exists (F_ash (n_ash_solution s)). apply n_ash_solution_satisfies_ODE.
+  Qed.
+
+  (* The closed-form solution is the Picard fixed point: applying the
+     Picard operator y |-> integral_0^t F(y) to n_ash_solution returns
+     n_ash_solution. This is the property the iteration converges to. *)
+  Lemma minus_R0_r : forall x : R, minus x 0 = x.
+  Proof. intro x. exact (minus_zero_r x). Qed.
+
+  Theorem n_ash_solution_fixed_point :
+    forall t,
+      n_ash_solution t
+      = RInt (fun s => F_ash (n_ash_solution s)) 0 t.
+  Proof.
+    intros t. symmetry.
+    apply is_RInt_unique.
+    replace (n_ash_solution t)
+      with (minus (n_ash_solution t) (n_ash_solution 0)).
+    - apply (is_RInt_derive n_ash_solution
+               (fun s => F_ash (n_ash_solution s)) 0 t).
+      + intros x _. apply n_ash_solution_satisfies_ODE.
+      + intros x _. unfold F_ash.
+        apply (continuous_minus (V := R_NormedModule)
+                 (fun _ => R_primary)
+                 (fun s => n_ash_solution s / tau_ash)).
+        * apply continuous_const.
+        * apply (continuous_mult n_ash_solution (fun _ => / tau_ash));
+            [apply n_ash_solution_cont | apply continuous_const].
+    - rewrite n_ash_solution_at_0. apply minus_R0_r.
+  Qed.
+
 End AshODE.
 
 (* ================================================================== *)
@@ -320,5 +355,6 @@ Print Assumptions picard_iter_1_is_source_integral.
 Print Assumptions picard_step1.
 Print Assumptions picard_step2.
 Print Assumptions picard_matches_closed_forms.
+Print Assumptions n_ash_solution_fixed_point.
 Print Assumptions n_ash_solution_nonneg.
 Print Assumptions n_ash_solution_bounded_by_eq.
