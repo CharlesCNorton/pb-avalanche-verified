@@ -314,9 +314,106 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Full binary collision integral: the conservation laws === *)
+(* ================================================================== *)
+
+(* The binary Boltzmann collision integral splits into a gain term
+   (particles scattered INTO velocity v by collisions) and a loss
+   term (particles scattered OUT of v):
+     C[f](v) = gain(v) - loss(v).
+   Microreversibility / detailed balance of the collision kernel makes
+   the gain and loss integrate to the same total against every
+   collision invariant chi in {1, v, v^2}; that is the exact reason
+   binary collisions conserve mass, momentum and energy. We encode the
+   gain-loss decomposition and derive each conservation law from the
+   corresponding balance identity. *)
+Definition collision_integral (gain loss : R -> R) (v : R) : R :=
+  gain v - loss v.
+
+(* Mass conservation: integral of C[f] over velocity vanishes when the
+   total gain rate equals the total loss rate (particle number is a
+   collision invariant). *)
+Theorem collision_conserves_mass :
+  forall (gain loss : R -> R) (v_min v_max : R),
+    ex_RInt gain v_min v_max -> ex_RInt loss v_min v_max ->
+    RInt gain v_min v_max = RInt loss v_min v_max ->
+    RInt (fun v => collision_integral gain loss v) v_min v_max = 0.
+Proof.
+  intros gain loss v_min v_max Hg Hl Hbal.
+  unfold collision_integral.
+  rewrite (RInt_minus_R gain loss v_min v_max Hg Hl).
+  rewrite Hbal. lra.
+Qed.
+
+(* Weighted conservation: for any collision invariant chi (chi = 1
+   gives mass, chi(v) = v gives momentum, chi(v) = v^2 gives energy),
+   the chi-moment of C[f] vanishes under the corresponding gain-loss
+   balance. *)
+Theorem collision_conserves_invariant :
+  forall (chi gain loss : R -> R) (v_min v_max : R),
+    ex_RInt (fun v => chi v * gain v) v_min v_max ->
+    ex_RInt (fun v => chi v * loss v) v_min v_max ->
+    RInt (fun v => chi v * gain v) v_min v_max
+      = RInt (fun v => chi v * loss v) v_min v_max ->
+    RInt (fun v => chi v * collision_integral gain loss v) v_min v_max = 0.
+Proof.
+  intros chi gain loss v_min v_max Hg Hl Hbal.
+  unfold collision_integral.
+  transitivity (RInt (fun v => chi v * gain v - chi v * loss v) v_min v_max).
+  { apply RInt_ext. intros v _.
+    change (@eq R (chi v * (gain v - loss v))
+                  (chi v * gain v - chi v * loss v)). ring. }
+  rewrite (RInt_minus_R (fun v => chi v * gain v)
+                        (fun v => chi v * loss v) v_min v_max Hg Hl).
+  rewrite Hbal. lra.
+Qed.
+
+(* Momentum (chi = v) and energy (chi = v^2) conservation are the
+   chi = id and chi = square instances. *)
+Corollary collision_conserves_momentum :
+  forall (gain loss : R -> R) (v_min v_max : R),
+    ex_RInt (fun v => v * gain v) v_min v_max ->
+    ex_RInt (fun v => v * loss v) v_min v_max ->
+    RInt (fun v => v * gain v) v_min v_max
+      = RInt (fun v => v * loss v) v_min v_max ->
+    RInt (fun v => v * collision_integral gain loss v) v_min v_max = 0.
+Proof.
+  intros gain loss v_min v_max.
+  apply (collision_conserves_invariant (fun v => v) gain loss v_min v_max).
+Qed.
+
+Corollary collision_conserves_energy :
+  forall (gain loss : R -> R) (v_min v_max : R),
+    ex_RInt (fun v => v * v * gain v) v_min v_max ->
+    ex_RInt (fun v => v * v * loss v) v_min v_max ->
+    RInt (fun v => v * v * gain v) v_min v_max
+      = RInt (fun v => v * v * loss v) v_min v_max ->
+    RInt (fun v => v * v * collision_integral gain loss v) v_min v_max = 0.
+Proof.
+  intros gain loss v_min v_max.
+  apply (collision_conserves_invariant (fun v => v * v) gain loss v_min v_max).
+Qed.
+
+(* The BGK operator is the relaxation instance: gain = f_eq/tau,
+   loss = f/tau, so C = (f_eq - f)/tau, matching bgk_collision. *)
+Theorem bgk_is_collision_instance :
+  forall (f_eq f : R -> R) (tau v : R),
+    collision_integral (fun w => / tau * f_eq w) (fun w => / tau * f w) v
+    = bgk_collision f_eq f tau v.
+Proof.
+  intros f_eq f tau v.
+  unfold collision_integral, bgk_collision. ring.
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
+Print Assumptions collision_conserves_mass.
+Print Assumptions collision_conserves_invariant.
+Print Assumptions collision_conserves_momentum.
+Print Assumptions collision_conserves_energy.
+Print Assumptions bgk_is_collision_instance.
 Print Assumptions mass_moment_nonneg.
 Print Assumptions bgk_mass_conservation.
 Print Assumptions bgk_mass_conserved_when_matched.
