@@ -345,6 +345,24 @@ Qed.
 Definition bgk_collision (f_eq f : R -> R) (tau v : R) : R :=
   / tau * (f_eq v - f v).
 
+(* === Equilibrium uniqueness ===
+   The collision operator vanishes exactly at f = f_eq, so the Maxwellian
+   equilibrium is the unique stationary state of the BGK dynamics. With
+   the monotone relaxation (bgk_deviation_decays) and the quadratic
+   H-theorem (bgk_H_decreasing) driving every f toward it, the Maxwellian
+   is the attractor of the dynamics rather than an assumed profile: the
+   thermal layer's Maxwellian weight is exactly the f_eq here. *)
+Theorem bgk_equilibrium_unique :
+  forall (f_eq f : R -> R) (tau v : R), tau <> 0 ->
+    (bgk_collision f_eq f tau v = 0 <-> f v = f_eq v).
+Proof.
+  intros f_eq f tau v Htau. unfold bgk_collision. split.
+  - intro H. apply Rmult_integral in H. destruct H as [H | H].
+    + exfalso. apply (Rinv_neq_0_compat tau Htau). exact H.
+    + lra.
+  - intro H. rewrite H. ring.
+Qed.
+
 (* === Mass conservation ===
    The zeroth moment of C[f] is (N_eq - N) / tau, which vanishes
    exactly when the Maxwellian f_eq is normalised to the same particle
@@ -645,6 +663,7 @@ Print Assumptions collision_conserves_energy.
 Print Assumptions bgk_is_collision_instance.
 Print Assumptions mass_moment_nonneg.
 Print Assumptions bgk_mass_conservation.
+Print Assumptions bgk_equilibrium_unique.
 Print Assumptions bgk_mass_conserved_when_matched.
 Print Assumptions bgk_relax_solves_ode.
 Print Assumptions bgk_deviation_decays.

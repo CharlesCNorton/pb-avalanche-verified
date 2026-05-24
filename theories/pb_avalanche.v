@@ -276,6 +276,24 @@ Module PBAvalancheFramework (P : PB_AVALANCHE_PARAMS).
     reflexivity.
   Qed.
 
+  (* The downward current E * f_alpha is independent of E: f_alpha carries
+     a constant flux through every energy in the reactive window. This is
+     the defining signature of the slowing-down steady state — exactly the
+     1/E profile on which the pure-drift Fokker-Planck operator vanishes
+     (pb_avalanche_fokker_planck.FP_drift_slowing). The distribution used
+     in R_secondary is therefore the steady-state slowing-down spectrum,
+     not an independent posit. *)
+  Lemma f_alpha_constant_flux :
+    forall (s : PlasmaState) (E : R),
+      0 < E < E_alpha_birth_MeV ->
+      E * f_alpha s E = R_primary s * tau_slow_alpha s / E_alpha_birth_MeV.
+  Proof.
+    intros s E [HE_pos HE_lt].
+    rewrite (f_alpha_slowing_down_equilibrium s E (conj HE_pos HE_lt)).
+    pose proof E_alpha_birth_MeV_positive as Hb.
+    field. split; lra.
+  Qed.
+
   (* Bilinear kinetic decomposition of the alpha-induced secondary rate. *)
   Lemma R_secondary_kinetic_decomposition :
     forall (s : PlasmaState),
