@@ -286,6 +286,99 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Genuine Euler-Maclaurin instance: f(x) = x^2 === *)
+(* ================================================================== *)
+
+(* The composite trapezoidal sum of x^2 on [a,b] with m equal
+   subintervals of width h: sum over subintervals k = 0..m-1 of the
+   trapezoid area h * (f(x_k) + f(x_{k+1})) / 2.  We sum the
+   (f(x_k)+f(x_{k+1}))/2 contributions here and multiply by h
+   afterwards. *)
+Fixpoint trap_terms_sq (a h : R) (m : nat) : R :=
+  match m with
+  | 0%nat => 0
+  | S k => trap_terms_sq a h k
+           + ((a + INR k * h) * (a + INR k * h)
+              + (a + INR (S k) * h) * (a + INR (S k) * h)) / 2
+  end.
+
+(* Closed form for the trapezoidal-term sum, proved by induction:
+   trap_terms_sq a h m
+     = m*a^2 + a*h*m^2 + h^2*(2 m^3 + m)/6. *)
+Lemma trap_terms_sq_closed :
+  forall (a h : R) (m : nat),
+    trap_terms_sq a h m
+    = INR m * (a * a)
+      + a * h * (INR m * INR m)
+      + h * h * (2 * (INR m * INR m * INR m) + INR m) / 6.
+Proof.
+  intros a h m. induction m as [|m IH].
+  - simpl. field.
+  - replace (trap_terms_sq a h (S m))
+      with (trap_terms_sq a h m
+            + ((a + INR m * h) * (a + INR m * h)
+               + (a + INR (S m) * h) * (a + INR (S m) * h)) / 2)
+      by reflexivity.
+    rewrite IH. rewrite (S_INR m). field.
+Qed.
+
+(* The composite trapezoidal rule for x^2 on [a,b] with n intervals. *)
+Definition trap_rule_sq (a b : R) (n : nat) : R :=
+  (b - a) / INR n * trap_terms_sq a ((b - a) / INR n) n.
+
+(* The exact integral of x^2 on [a,b]. *)
+Definition integral_sq (a b : R) : R := (b * b * b - a * a * a) / 3.
+
+(* THE EULER-MACLAURIN IDENTITY for x^2: the composite trapezoidal
+   rule equals the exact integral plus exactly the h^2 term
+   (b-a)^3 / (6 n^2) — with NO higher-order terms, because x^2 has
+   vanishing third and higher derivatives. This is the genuine
+   order-2 Euler-Maclaurin expansion, proved exactly. *)
+Theorem trap_rule_sq_euler_maclaurin :
+  forall (a b : R) (n : nat), (0 < n)%nat ->
+    trap_rule_sq a b n
+    = integral_sq a b
+      + (b - a) * (b - a) * (b - a) / (6 * (INR n * INR n)).
+Proof.
+  intros a b n Hn.
+  unfold trap_rule_sq, integral_sq.
+  rewrite trap_terms_sq_closed.
+  assert (HnR : INR n <> 0) by (apply not_0_INR; lia).
+  field. exact HnR.
+Qed.
+
+(* === Richardson extrapolation is EXACT for x^2 === *)
+
+(* Because the trapezoidal error for x^2 is purely c * h^2 (no h^4
+   term), level-1 Richardson R_1 = (4 T_{2n} - T_n)/3 recovers the
+   exact integral with zero error. *)
+Theorem richardson_1_exact_for_sq :
+  forall (a b : R) (n : nat), (0 < n)%nat ->
+    richardson_1 (trap_rule_sq a b n) (trap_rule_sq a b (2 * n))
+    = integral_sq a b.
+Proof.
+  intros a b n Hn.
+  assert (H2n : (0 < 2 * n)%nat) by lia.
+  rewrite (trap_rule_sq_euler_maclaurin a b n Hn).
+  rewrite (trap_rule_sq_euler_maclaurin a b (2 * n) H2n).
+  unfold richardson_1.
+  rewrite mult_INR. simpl (INR 2).
+  assert (HnR : INR n <> 0) by (apply not_0_INR; lia).
+  field. exact HnR.
+Qed.
+
+(* The residual trapezoidal error after level-1 Richardson for x^2 is
+   exactly zero — strictly better than the O(h^2) of the raw rule. *)
+Theorem richardson_1_residual_zero_sq :
+  forall (a b : R) (n : nat), (0 < n)%nat ->
+    richardson_1 (trap_rule_sq a b n) (trap_rule_sq a b (2 * n))
+    - integral_sq a b = 0.
+Proof.
+  intros a b n Hn.
+  rewrite (richardson_1_exact_for_sq a b n Hn). ring.
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
@@ -298,3 +391,6 @@ Print Assumptions richardson_1_reduces_to_O_h4.
 Print Assumptions richardson_2_kills_h4.
 Print Assumptions richardson_k_kills_pure.
 Print Assumptions const_trap_richardson_exact.
+Print Assumptions trap_terms_sq_closed.
+Print Assumptions trap_rule_sq_euler_maclaurin.
+Print Assumptions richardson_1_exact_for_sq.
