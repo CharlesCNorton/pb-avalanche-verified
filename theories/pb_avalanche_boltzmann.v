@@ -406,6 +406,113 @@ Proof.
 Qed.
 
 (* ================================================================== *)
+(* === Quadratic H-theorem for BGK relaxation === *)
+(* ================================================================== *)
+
+(* Velocity-resolved BGK relaxation: at each velocity the deviation from
+   equilibrium decays as exp(-t/tau). *)
+Definition bgk_relax_v (feq f0 : R -> R) (tau t v : R) : R :=
+  feq v + (f0 v - feq v) * exp (- t / tau).
+
+(* Quadratic entropy: the squared L^2 distance to equilibrium. The
+   genuine Boltzmann H-functional uses f ln(f/f_eq); the convex
+   quadratic surrogate is the standard rigorous Lyapunov functional for
+   the linear BGK relaxation and obeys the same monotone-decay law. *)
+Definition bgk_H (feq f0 : R -> R) (tau t v_min v_max : R) : R :=
+  RInt (fun v => (bgk_relax_v feq f0 tau t v - feq v) ^ 2) v_min v_max.
+
+(* Closed form: H(t) = exp(-2 t / tau) * H(0). *)
+Lemma bgk_H_closed_form :
+  forall (feq f0 : R -> R) (tau t v_min v_max : R), 0 < tau ->
+    ex_RInt (fun v => (f0 v - feq v) ^ 2) v_min v_max ->
+    bgk_H feq f0 tau t v_min v_max
+    = exp (- 2 * t / tau) * RInt (fun v => (f0 v - feq v) ^ 2) v_min v_max.
+Proof.
+  intros feq f0 tau t vmin vmax Htau Hex.
+  unfold bgk_H, bgk_relax_v.
+  rewrite <- (RInt_scal_R (fun v => (f0 v - feq v) ^ 2) vmin vmax
+                (exp (- 2 * t / tau)) Hex).
+  apply RInt_ext. intros v _.
+  replace (feq v + (f0 v - feq v) * exp (- t / tau) - feq v)
+    with ((f0 v - feq v) * exp (- t / tau)) by ring.
+  rewrite Rpow_mult_distr.
+  assert (He2 : exp (- t / tau) ^ 2 = exp (- 2 * t / tau)).
+  { replace (exp (- t / tau) ^ 2)
+      with (exp (- t / tau) * exp (- t / tau)) by ring.
+    rewrite <- exp_plus.
+    replace (- t / tau + - t / tau) with (- 2 * t / tau) by (field; lra).
+    reflexivity. }
+  rewrite He2. lra.
+Qed.
+
+(* The entropy is nonnegative (an integral of squares). *)
+Lemma bgk_H_nonneg :
+  forall (feq f0 : R -> R) (tau t v_min v_max : R), 0 < tau ->
+    v_min <= v_max ->
+    ex_RInt (fun v => (f0 v - feq v) ^ 2) v_min v_max ->
+    0 <= bgk_H feq f0 tau t v_min v_max.
+Proof.
+  intros feq f0 tau t vmin vmax Htau Hord Hex.
+  rewrite (bgk_H_closed_form feq f0 tau t vmin vmax Htau Hex).
+  apply Rmult_le_pos.
+  - apply Rlt_le. apply exp_pos.
+  - apply RInt_ge_0; [ exact Hord | exact Hex | intros x _; apply pow2_ge_0 ].
+Qed.
+
+(* The H-theorem: the quadratic entropy decreases monotonically in time,
+   driven to equilibrium by the relaxation. *)
+Theorem bgk_H_decreasing :
+  forall (feq f0 : R -> R) (tau t1 t2 v_min v_max : R), 0 < tau ->
+    0 <= t1 <= t2 -> v_min <= v_max ->
+    ex_RInt (fun v => (f0 v - feq v) ^ 2) v_min v_max ->
+    bgk_H feq f0 tau t2 v_min v_max <= bgk_H feq f0 tau t1 v_min v_max.
+Proof.
+  intros feq f0 tau t1 t2 vmin vmax Htau [Ht1 Ht12] Hord Hex.
+  rewrite (bgk_H_closed_form feq f0 tau t2 vmin vmax Htau Hex).
+  rewrite (bgk_H_closed_form feq f0 tau t1 vmin vmax Htau Hex).
+  apply Rmult_le_compat_r.
+  - apply RInt_ge_0; [ exact Hord | exact Hex | intros x _; apply pow2_ge_0 ].
+  - destruct (Req_dec t1 t2) as [Heq | Hne].
+    + subst. apply Rle_refl.
+    + apply Rlt_le. apply exp_increasing.
+      assert (Hinv : 0 < / tau) by (apply Rinv_0_lt_compat; exact Htau).
+      unfold Rdiv.
+      apply Rmult_lt_compat_r; [ exact Hinv | lra ].
+Qed.
+
+(* The differential H-theorem (entropy production):
+     dH/dt = -(2/tau) H(t),
+   so with H >= 0 the production rate is nonpositive everywhere. *)
+Theorem bgk_entropy_production :
+  forall (feq f0 : R -> R) (tau t v_min v_max : R), 0 < tau ->
+    ex_RInt (fun v => (f0 v - feq v) ^ 2) v_min v_max ->
+    is_derive (fun s => bgk_H feq f0 tau s v_min v_max) t
+              (- (2 / tau) * bgk_H feq f0 tau t v_min v_max).
+Proof.
+  intros feq f0 tau t vmin vmax Htau Hex.
+  apply (is_derive_ext
+           (fun s => exp (- 2 * s / tau)
+                     * RInt (fun v => (f0 v - feq v) ^ 2) vmin vmax)).
+  - intro s. symmetry.
+    exact (bgk_H_closed_form feq f0 tau s vmin vmax Htau Hex).
+  - rewrite (bgk_H_closed_form feq f0 tau t vmin vmax Htau Hex).
+    generalize (RInt (fun v => (f0 v - feq v) ^ 2) vmin vmax); intro Q.
+    auto_derive; [ lra | ]. unfold Rdiv; ring.
+Qed.
+
+Corollary bgk_entropy_production_nonpos :
+  forall (feq f0 : R -> R) (tau t v_min v_max : R), 0 < tau ->
+    v_min <= v_max ->
+    ex_RInt (fun v => (f0 v - feq v) ^ 2) v_min v_max ->
+    - (2 / tau) * bgk_H feq f0 tau t v_min v_max <= 0.
+Proof.
+  intros feq f0 tau t vmin vmax Htau Hord Hex.
+  pose proof (bgk_H_nonneg feq f0 tau t vmin vmax Htau Hord Hex) as HH.
+  assert (H2 : 0 < 2 / tau) by (apply Rdiv_lt_0_compat; lra).
+  nra.
+Qed.
+
+(* ================================================================== *)
 (* === Axiom audit === *)
 (* ================================================================== *)
 
@@ -423,3 +530,8 @@ Print Assumptions f_slowing_pos.
 Print Assumptions f_slowing_decreasing.
 Print Assumptions energy_moment_slowing.
 Print Assumptions energy_decay_slow_down.
+Print Assumptions bgk_H_closed_form.
+Print Assumptions bgk_H_nonneg.
+Print Assumptions bgk_H_decreasing.
+Print Assumptions bgk_entropy_production.
+Print Assumptions bgk_entropy_production_nonpos.
